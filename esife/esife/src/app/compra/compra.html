@@ -1,1 +1,12 @@
 <p>compra works!</p>
+
+Importe: <input type="number" [(ngModel)]="importe">
+<button (click)="irAlPago()">Ir al Pago</button>
+
+<br>
+
+<div *ngIf="clientSecret">
+  Datos de tarjeta: 4242 4242 4242 4242<br>
+  Fecha de caducidad: 12/34<br>
+  CVC: 123<br>
+</div>
