@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import edu.esi.ds.esiusuarios.dto.LoginRequest;
+import edu.esi.ds.esiusuarios.dto.RegisterRequest;
 import edu.esi.ds.esiusuarios.services.UserService;
 
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +24,7 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/login")    
+    @PostMapping("/login1")    
     public String login(@RequestBody Map<String, String> credentials){
         JSONObject jsoCredentials = new JSONObject(credentials);
         String name = jsoCredentials.optString("name");
@@ -36,6 +38,16 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas.");
         }
         return result;
+    }
+
+    @PostMapping("/login")
+    public String login(@RequestBody LoginRequest req) {
+        return userService.login(req);
+    }
+
+    @PostMapping("/register")
+    public void register(@RequestBody RegisterRequest req) {
+        userService.register(req);
     }
 
 }
