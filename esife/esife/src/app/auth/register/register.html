@@ -1,0 +1,49 @@
+<section class="auth-card">
+  <h2>Crear cuenta</h2>
+
+  <form (ngSubmit)="submit()" #f="ngForm" novalidate>
+    <label>
+      Email
+      <input type="email" name="email" [(ngModel)]="email" required autocomplete="email" />
+    </label>
+
+    <label>
+      Nombre
+      <input type="text" name="name" [(ngModel)]="name" autocomplete="name" />
+    </label>
+
+    <label>
+      Contraseña
+      <input
+        type="password"
+        name="password"
+        [(ngModel)]="password"
+        required
+        autocomplete="new-password"
+      />
+    </label>
+    <p class="hint">
+      Mínimo 10 caracteres. Debe incluir mayúscula, minúscula, dígito y carácter especial.
+    </p>
+
+    <label>
+      Repite la contraseña
+      <input
+        type="password"
+        name="confirm"
+        [(ngModel)]="confirm"
+        required
+        autocomplete="new-password"
+      />
+    </label>
+
+    <button type="submit" [disabled]="loading">
+      {{ loading ? 'Creando…' : 'Registrarme' }}
+    </button>
+  </form>
+
+  <p class="error" *ngIf="error">{{ error }}</p>
+  <p *ngIf="success">Cuenta creada. Redirigiendo al login…</p>
+
+  <p>¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+</section>

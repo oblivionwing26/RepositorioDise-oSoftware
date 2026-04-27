@@ -1,3 +1,14 @@
-<espectaculos></espectaculos>
+<nav class="topbar">
+  <a routerLink="/" class="brand">esientradas</a>
+  <span class="spacer"></span>
+  <ng-container *ngIf="!isLogged; else logged">
+    <a routerLink="/login">Iniciar sesión</a>
+    <a routerLink="/register">Registrarse</a>
+  </ng-container>
+  <ng-template #logged>
+    <span class="user">Hola, {{ userName }}</span>
+    <button type="button" (click)="logout()">Cerrar sesión</button>
+  </ng-template>
+</nav>
 
 <router-outlet />

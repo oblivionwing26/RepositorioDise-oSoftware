@@ -3,7 +3,12 @@ package edu.esi.ds.esientradas.services;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
+import com.stripe.param.PaymentIntentCreateParams;
+
 import edu.esi.ds.esientradas.dao.ConfirmarPagoDao;
+import edu.esi.ds.esientradas.dao.ConfiguracionDao;
 import edu.esi.ds.esientradas.dao.PagoDao;
 import edu.esi.ds.esientradas.model.Confirmacion;
 import edu.esi.ds.esientradas.model.Pago;
@@ -17,32 +22,54 @@ public class PagosService {
     @Autowired
     private ConfirmarPagoDao confirmarPagoDao;
 
+    @Autowired
+    private ConfiguracionDao configuracionDao;
+
+    @Autowired
+    private PDFService pdfService;
+
     public String prepararPago(Long centimos) {
-        // Crear registro del pago en BD
-        Pago pago = new Pago();
-        pago.setCentimos(centimos);
-        pago.setEstado("PENDIENTE");
+        try {
+            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                .setAmount(centimos)
+                .setCurrency("eur")
+                .addPaymentMethodType("card")
+                .build();
 
-        // TODO: Conectar con Stripe para obtener clientSecret real
-        // Por ahora, guardamos el pago y devolvemos un clientSecret simulado
-        String clientSecretSimulado = "cs_test_" + System.currentTimeMillis();
-        pago.setClientSecret(clientSecretSimulado);
+            PaymentIntent intent = PaymentIntent.create(params);
 
-        this.pagoDao.save(pago);
+            Pago pago = new Pago();
+            pago.setCentimos(centimos);
+            pago.setEstado("PENDIENTE");
+            pago.setClientSecret(intent.getClientSecret());
+            pago.setPaymentIntentId(intent.getId());
 
-        return clientSecretSimulado;
+            this.pagoDao.save(pago);
+
+            return intent.getClientSecret();
+        } catch (StripeException e) {
+            throw new RuntimeException("Error al crear el PaymentIntent en Stripe", e);
+        }
     }
 
     public String confirmarPago(String paymentIntentId) {
-        // TODO: Verificar con Stripe que el pago se ha completado
+        try {
+            PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
 
-        // Registrar confirmación en BD
-        Confirmacion confirmacion = new Confirmacion();
-        confirmacion.setPaymentIntentId(paymentIntentId);
-        confirmacion.setEstado("CONFIRMADO");
+            Confirmacion confirmacion = new Confirmacion();
+            confirmacion.setPaymentIntentId(paymentIntentId);
+            confirmacion.setEstado(intent.getStatus());
 
-        this.confirmarPagoDao.save(confirmacion);
+            this.confirmarPagoDao.save(confirmacion);
 
-        return "Pago confirmado correctamente";
+            if ("succeeded".equals(intent.getStatus())) {
+                // Buscar el pago asociado y generar PDF
+                return "Pago confirmado correctamente";
+            }
+
+            return "Estado del pago: " + intent.getStatus();
+        } catch (StripeException e) {
+            throw new RuntimeException("Error al confirmar el pago en Stripe", e);
+        }
     }
 }

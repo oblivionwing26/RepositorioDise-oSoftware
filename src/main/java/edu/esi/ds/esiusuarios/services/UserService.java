@@ -41,10 +41,8 @@ public class UserService {
 	}
 
     public String checkToken(String token) {
-        for(User user : this.users){
-            if(user.getToken().equals(token)){
-                return user.getName();
-            }
+        if (jwtService.isTokenValid(token)) {
+            return jwtService.getEmailFromToken(token);
         }
         return null;
     }
