@@ -1,19 +1,19 @@
-package edu.esi.ds.esiusuarios.model;
+package edu.esi.ds.esiusuarios.dto;
 
 
 public class LoginResponse {
     private String token;
-    private long ExpiresInMs;
+    private long expiresIn;
 
     public LoginResponse(){}
 
-    public LoginResponse (String token, long ExpiresInMs) {
+    public LoginResponse(String token, long expiresIn) {
         this.token = token;
-        this.ExpiresInMs = ExpiresInMs;
+        this.expiresIn = expiresIn;
     }
 
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }
-    public long getExpiresInMs() { return ExpiresInMs; }
-    public void setExpiresInMs(long expiresInMs) { this.ExpiresInMs = expiresInMs; }
+    public long getExpiresIn() { return expiresIn; }
+    public void setExpiresIn(long expiresIn) { this.expiresIn = expiresIn; }
 }

@@ -2,15 +2,16 @@ package edu.esi.ds.esiusuarios.services;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Optional;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import edu.esi.ds.esiusuarios.dao.PasswordResetTokenDao;
@@ -18,156 +19,188 @@ import edu.esi.ds.esiusuarios.dao.UserDao;
 import edu.esi.ds.esiusuarios.dto.ForgotPasswordRequest;
 import edu.esi.ds.esiusuarios.dto.LoginRequest;
 import edu.esi.ds.esiusuarios.dto.RegisterRequest;
-import edu.esi.ds.esiusuarios.dto.RegisterRequest;
-import edu.esi.ds.esiusuarios.dto.ResetPasswordRequest; 
+import edu.esi.ds.esiusuarios.dto.ResetPasswordRequest;
 import edu.esi.ds.esiusuarios.model.PasswordResetToken;
 import edu.esi.ds.esiusuarios.model.User;
-
 
 @Service
 public class UserService {
 
-    @Autowired private UserDao userDao;
-    @Autowired private PasswordResetTokenDao resetDao;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private JwtService jwtService;
-    @Autowired private PasswordPolicy passwordPolicy;
-    @Autowired private EmailService emailService;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    @Value("${app.reset.expiration-minutes}")
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UserDao userDao;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @Autowired
+    private PasswordPolicy passwordPolicy;
+
+    @Autowired
+    private PasswordResetTokenDao passwordResetTokenDao;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Value("${app.reset.expiration-minutes:15}")
     private long resetExpirationMinutes;
 
-    private final SecureRandom random = new SecureRandom();
-
-    //Registro
-
+    @Transactional
     public void register(RegisterRequest req) {
-        if (req.getEmail() == null || req.getEmail().isBlank()){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email es obligatorio.");
+        if (req == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de registro requeridos");
         }
+
+        String email = normalizeEmail(req.getEmail());
+        validateEmail(email);
         passwordPolicy.validate(req.getPassword());
 
-        String email = req.getEmail().toLowerCase();
-        if(userDao.existsEmail(email)){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email ya está registrado.");
+        if (userDao.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya esta registrado");
         }
 
-        User user = new User(email, passwordEncoder.encode(req.getPassword()));
+        User user = new User();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+        user.setActive(true);
+
         userDao.save(user);
     }
 
-    //Login
-    public LoginResponse login (LoginRequest req){
-        if (req.getEmail() == null || req.getEmail().isBBlank() || req.getPassword() == null || req.getPassword().isBlank()){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email y la contraseña son obligatorios.");
+    @Transactional(readOnly = true)
+    public String login(LoginRequest req) {
+        if (req == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de login requeridos");
         }
 
-        User user = userDao.findByEmail(req.getEmail().trim().toLowerCase())
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED, "Credenciales invalidas."));
+        String email = normalizeEmail(req.getEmail());
+        validateEmail(email);
+
+        User user = userDao
+            .findByEmail(email)
+            .orElseThrow(() -> invalidCredentials());
 
         if (!user.isActive()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Cuenta desactivada");
-
-        if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas.");
+            throw invalidCredentials();
         }
 
-        String jwt = jwtService.generateToken(user);
-        return new LoginResponse (jwt, jwtService.getExpirationMs());
+        if (req.getPassword() == null || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+            throw invalidCredentials();
         }
+
+        return jwtService.generateToken(user);
     }
 
-
-    //Validacion de token sist externos
-
+    @Transactional(readOnly = true)
     public String checkToken(String token) {
-        if (token == null || token.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token vacio.");
+        String email = normalizeEmail(jwtService.validateAndGetEmail(token));
+        User user = userDao
+            .findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token no valido"));
+
+        if (!user.isActive()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario inactivo");
         }
-        try {
-            return jwtService.validateAndGetEmail(token);
-        } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token invalido o expirado.");
-        }
+
+        return user.getEmail();
     }
 
-
-    //Solicitar token de recuperacion de contraseña
-
+    @Transactional
     public void forgotPassword(ForgotPasswordRequest req) {
-        // No revelamos si el email existe (evitar user enumeration)
-        Optional<User> opt = userDao.findByEmail(req.getEmail().trim().toLowerCase());
-        if (opt.isEmpty()) {
+        if (req == null || req.getEmail() == null || req.getEmail().isBlank()) {
             return;
         }
-        User user = opt.get();
 
-        // 1. Generar token aleatorio fuerte (32 bytes > base64)
-        byte[] raw = new byte[32];
-        random.nextBytes(raw);
-        String plainToken = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        String email = normalizeEmail(req.getEmail());
+        userDao.findByEmail(email)
+            .filter(User::isActive)
+            .ifPresent(user -> {
+                String token = generateResetToken();
+                PasswordResetToken resetToken = new PasswordResetToken();
+                resetToken.setUser(user);
+                resetToken.setTokenHash(passwordEncoder.encode(token));
+                resetToken.setExpiresAt(Instant.now().plusSeconds(resetExpirationMinutes * 60));
+                resetToken.setUsed(false);
 
-        // 2. Guardar SOLO el hash en BD
-        String tokenHash = passwordEncoder.encode(plainToken);
-        Instant expiresAt = Instant.now().plus(resetExpirationMinutes, ChronoUnit.MINUTES);
-
-        resetDao.save(new PasswordResetToken(user, tokenHash, expiresAt));
-
-        // 3. Enviar al usuario el token EN CLARO (solo a su email)
-        emailService.sendResetEmail(user.getEmail(), plainToken);
+                passwordResetTokenDao.save(resetToken);
+                emailService.sendResetEmail(user.getEmail(), token);
+            });
     }
 
-    //Restablecer contraseña usando el token
-
+    @Transactional
     public void resetPassword(ResetPasswordRequest req) {
-        if (req.getToken() == null || req.getToken().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token vacio.");
+        if (req == null || req.getToken() == null || req.getToken().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token de recuperacion requerido");
         }
+
         passwordPolicy.validate(req.getNewPassword());
 
-        // BCrypt incluye salt por hash, asi que recorremos los tokens vigentes
-        // y comparamos con passwordEncoder.matches.
-        PasswordResetToken match = resetDao.findAll().stream()
-            .filter(t -> !t.isUsed())
-            .filter(t -> t.getExpiresAt().isAfter(Instant.now()))
-            .filter(t -> passwordEncoder.matches(req.getToken(), t.getTokenHash()))
-            .findFirst()
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED, "Token invalido, usado o expirado."));
-
-        // Actualizar contrasena del usuario.
-        User user = match.getUser();
+        PasswordResetToken resetToken = findValidResetToken(req.getToken());
+        User user = resetToken.getUser();
         user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
-        user.setUpdatedAt(Instant.now());
-        userDao.save(user);
+        user.setActive(true);
+        resetToken.setUsed(true);
 
-        // Marcar token como usado (un solo uso).
-        match.setUsed(true);
-        resetDao.save(match);
+        userDao.save(user);
+        passwordResetTokenDao.save(resetToken);
     }
 
-    //Cancelar cuenta
+    @Transactional
+    public void cancelAccount(String authorizationHeader) {
+        String token = extractBearerToken(authorizationHeader);
+        String email = checkToken(token);
+        User user = userDao
+            .findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token no valido"));
 
-        public void cancelAccount(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Falta token.");
-        }
-        String jwt = authHeader.substring(7);
-        String email;
-        try {
-            email = jwtService.validateAndGetEmail(jwt);
-        } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token invalido.");
-        }
-        User user = userDao.findByEmail(email)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
-
-        // Borrado logico: marcar como inactivo (mejor que delete fisico por integridad referencial).
         user.setActive(false);
-        user.setUpdatedAt(Instant.now());
         userDao.save(user);
     }
 
+    public long getJwtExpirationMs() {
+        return jwtService.getExpirationMs();
+    }
 
+    private PasswordResetToken findValidResetToken(String rawToken) {
+        List<PasswordResetToken> candidates = passwordResetTokenDao.findByUsedFalseAndExpiresAtAfter(Instant.now());
+        return candidates.stream()
+            .filter(candidate -> passwordEncoder.matches(rawToken, candidate.getTokenHash()))
+            .findFirst()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token de recuperacion no valido o expirado"));
+    }
+
+    private String generateResetToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void validateEmail(String email) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email no valido");
+        }
+    }
+
+    private ResponseStatusException invalidCredentials() {
+        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales no validas");
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token bearer requerido");
+        }
+        return authorizationHeader.substring("Bearer ".length()).trim();
+    }
 }

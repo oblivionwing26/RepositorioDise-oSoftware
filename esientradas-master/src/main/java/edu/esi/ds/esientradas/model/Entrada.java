@@ -1,5 +1,7 @@
 package edu.esi.ds.esientradas.model;
 
+import java.time.LocalDateTime;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Entity;
@@ -20,6 +22,9 @@ public abstract class Entrada {
     @Id @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     protected Long id;
     private Long precio;     // Ojo: en céntimos de euro
+    private String tokenPrerreserva;
+    private LocalDateTime prerreservaExpiraEn;
+    private String usuarioPrerreserva;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "espectaculo_id", nullable = false)

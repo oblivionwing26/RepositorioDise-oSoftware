@@ -18,8 +18,11 @@ public class EmailService {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
-    @Value("${app.email.from}")
+    @Value("${app.email.from:}")
     private String from;
+
+    @Value("${app.reset.expiration-minutes:15}")
+    private long resetExpirationMinutes;
 
     //Envía el token de recuperacion al correo solicitante, si SMPT no está configurado,
     //se muestra el token en consola, si lo está el flujo sigue con normalidad}
@@ -30,7 +33,7 @@ public class EmailService {
             + "Has solicitado restablecer tu contrasena en ESI Entradas.\n"
             + "Usa este token (valido durante unos minutos) en la pantalla de 'Restablecer contrasena':\n\n"
             + token + "\n\n"
-            + "El token es valido por " + (new JwtService(null, 0).getExpirationMs() / 60000) + " minutos.\n\n";
+            + "El token es valido por " + resetExpirationMinutes + " minutos.\n\n";
 
             if (mailSender == null || from == null || from.isBlank()) {
             log.warn("SMTP no configurado (spring.mail.* / app.mail.from). Mostrando email por consola.");

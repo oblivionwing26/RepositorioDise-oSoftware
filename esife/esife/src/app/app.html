@@ -1,3 +1,13 @@
-<espectaculos></espectaculos>
+<nav style="display:flex; gap:1rem; padding:.5rem 1rem; background:#f5f5f5;">
+  <a routerLink="/">Espectáculos</a>
+  <span style="flex:1"></span>
+  <ng-container *ngIf="!isLogged(); else logged">
+    <a routerLink="/login">Login</a>
+    <a routerLink="/register">Registro</a>
+  </ng-container>
+  <ng-template #logged>
+    <button (click)="logout()">Cerrar sesión</button>
+  </ng-template>
+</nav>
 
 <router-outlet />

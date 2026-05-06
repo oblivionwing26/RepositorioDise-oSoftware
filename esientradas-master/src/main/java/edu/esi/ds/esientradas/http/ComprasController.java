@@ -23,10 +23,9 @@ public class ComprasController {
     @PutMapping("/comprar")
     public String comprar ( 
         @RequestParam String tokenEntrada,
-        @RequestParam Strin tokenUsuario
-    ){
+        @RequestParam String tokenUsuario) {
         if (tokenUsuario == null || tokenUsuario.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token del usuario es requerido");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "El token del usuario es requerido");
         }
 
         if (tokenEntrada == null || tokenEntrada.isBlank()) {
