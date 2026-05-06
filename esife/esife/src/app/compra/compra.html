@@ -31,13 +31,27 @@
         <dt>Precio</dt>
         <dd>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</dd>
       </div>
+      <div *ngIf="prerreserva">
+        <dt>Prerreserva</dt>
+        <dd>Hasta {{ prerreserva.expiraEn }}</dd>
+      </div>
+      <div *ngIf="compra">
+        <dt>Estado</dt>
+        <dd>{{ compra.estado }}</dd>
+      </div>
     </dl>
 
-    <button type="button" (click)="comprar()" [disabled]="loading">
-      {{ loading ? 'Validando...' : 'Comprar entrada' }}
+    <p *ngIf="loadingPrerreserva" class="muted">Creando prerreserva...</p>
+
+    <p *ngIf="prerreserva && !compra" class="ok">
+      Entrada prerreservada. Puedes confirmar la compra antes de que expire.
+    </p>
+
+    <button type="button" (click)="comprar()" [disabled]="loading || loadingPrerreserva || !prerreserva || !!compra">
+      {{ loading ? 'Comprando...' : 'Comprar entrada' }}
     </button>
 
-    <button type="button" (click)="irAlPago()" [disabled]="loading">
+    <button type="button" (click)="irAlPago()" [disabled]="loading || loadingPrerreserva || !!compra">
       Preparar pago simulado
     </button>
   </article>

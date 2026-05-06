@@ -6,7 +6,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import edu.esi.ds.esientradas.dto.DtoPrerreserva;
 import edu.esi.ds.esientradas.services.ReservasService;
+import edu.esi.ds.esientradas.services.UsuariosService;
 import jakarta.servlet.http.HttpSession;
 
 @RestController
@@ -14,6 +16,9 @@ import jakarta.servlet.http.HttpSession;
 public class ReservasController {
     @Autowired
     private ReservasService service;
+
+    @Autowired
+    private UsuariosService usuariosService;
 
     @PutMapping("/reservar")
     public Long reservar(HttpSession session, @RequestParam Long idEntrada) {
@@ -28,5 +33,13 @@ public class ReservasController {
 
         session.setAttribute("precioTotal", precioTotal);
         return precioTotal;
+    }
+
+    @PutMapping("/prerreservar")
+    public DtoPrerreserva prerreservar(
+            @RequestParam Long idEntrada,
+            @RequestParam String tokenUsuario) {
+        String email = this.usuariosService.checkToken(tokenUsuario);
+        return this.service.prerreservar(idEntrada, email);
     }
 }

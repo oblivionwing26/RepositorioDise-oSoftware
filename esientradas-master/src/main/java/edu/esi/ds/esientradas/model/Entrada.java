@@ -14,6 +14,7 @@ import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.persistence.OneToOne;
 
 @Entity
@@ -22,6 +23,7 @@ public abstract class Entrada {
     @Id @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     protected Long id;
     private Long precio;     // Ojo: en céntimos de euro
+    @Column(unique = true)
     private String tokenPrerreserva;
     private LocalDateTime prerreservaExpiraEn;
     private String usuarioPrerreserva;

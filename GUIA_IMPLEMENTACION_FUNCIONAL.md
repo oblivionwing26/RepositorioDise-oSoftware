@@ -2149,6 +2149,7 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - Fase de estabilizacion inmediata completada: `esientradas` tiene CORS global para `localhost:4000` y `localhost:4200`, los dos backends compilan con Maven y el frontend compila con `npm run build`.
 - Fase de autenticacion y usuarios completada: eliminado `/users/login1`, registro/login usan SQL Server, JWT real, validacion de password/email, reset por token temporal, cancelacion por Bearer token y `/external/checktoken/{token}` devuelve el email del usuario autenticado.
 - Se permitio `/error` en Spring Security para que los errores reales lleguen al cliente como `400`, `401` o `409`, en vez de quedar convertidos en `403`.
+- Email de recuperacion corregido: genera enlace directo a `/reset-password?token=...`, soporta `app.mail.from` y mantiene modo consola si SMTP no esta configurado o falla.
 
 ### Checklist de estabilizacion inmediata
 
@@ -2198,22 +2199,22 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 
 ### Checklist de prerreserva
 
-- [ ] Crear flujo `prerreservar(idEntrada, tokenUsuario)`.
-- [ ] Validar usuario llamando a `esiusuarios`.
-- [ ] Generar `tokenEntrada` temporal.
-- [ ] Guardar expiracion de prerreserva.
-- [ ] Impedir prerreservar una entrada vendida o ya bloqueada.
-- [ ] Liberar automaticamente prerreservas expiradas.
-- [ ] Probar caso feliz y casos de conflicto.
+- [x] Crear flujo `prerreservar(idEntrada, tokenUsuario)`.
+- [x] Validar usuario llamando a `esiusuarios`.
+- [x] Generar `tokenEntrada` temporal.
+- [x] Guardar expiracion de prerreserva.
+- [x] Impedir prerreservar una entrada vendida o ya bloqueada.
+- [x] Liberar automaticamente prerreservas expiradas.
+- [x] Probar caso feliz y casos de conflicto.
 
 ### Checklist de compra definitiva
 
-- [ ] Cambiar compra para exigir `tokenEntrada` y `tokenUsuario`.
-- [ ] Validar que el token de entrada existe, no ha expirado y pertenece al usuario.
-- [ ] Marcar entrada como `VENDIDA` solo al final del flujo.
+- [x] Cambiar compra para exigir `tokenEntrada` y `tokenUsuario`.
+- [x] Validar que el token de entrada existe, no ha expirado y pertenece al usuario.
+- [x] Marcar entrada como `VENDIDA` solo al final del flujo.
 - [ ] Registrar datos minimos de la compra.
-- [ ] Devolver una respuesta util para Angular: estado, entrada comprada, precio y mensaje.
-- [ ] Probar compra correcta, token expirado, token de otro usuario y entrada ya vendida.
+- [x] Devolver una respuesta util para Angular: estado, entrada comprada, precio y mensaje.
+- [x] Probar compra correcta, token expirado, token de otro usuario y entrada ya vendida.
 
 ### Checklist de email tras compra
 
@@ -2275,3 +2276,13 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - La seleccion de entradas en Angular carga escenarios, espectaculos, resumen y entradas libres; si no hay sesion guarda la seleccion, redirige a login y vuelve a `/comprar` tras guardar el JWT.
 - Configurado el SSR de Angular con `allowedHosts` para `localhost` y `127.0.0.1`, evitando el fallback por proteccion SSRF al abrir `http://localhost:4000`.
 - Validaciones realizadas: `mvnw clean compile` en `esiusuarios` y `esientradas-master`, `npm run build`, consulta real de disponibilidad (`total=1007`, `libres=1007`) y prueba en navegador hasta compra autorizada.
+
+### Resumen de fase: prerreserva, compra definitiva y reset email
+
+- Anadido `/reservas/prerreservar?idEntrada&tokenUsuario`: valida el JWT contra `esiusuarios`, bloquea la entrada con `PESSIMISTIC_WRITE`, genera `tokenEntrada` UUID, guarda expiracion y usuario propietario.
+- La compra definitiva ahora busca por `tokenEntrada`, exige estado `PRERRESERVADA`, comprueba expiracion y valida que `usuarioPrerreserva` coincide con el email del JWT antes de marcar `VENDIDA`.
+- Activado `@EnableScheduling` y liberacion automatica de prerreservas expiradas cada minuto; se limpian token, usuario y expiracion.
+- Anadido `schema.sql` en `esientradas` para ampliar el enum MySQL `entrada.estado` con `PRERRESERVADA`; sin esta migracion MySQL truncaba el valor y devolvia `500`.
+- Angular crea la prerreserva al entrar en `/comprar`, muestra `expiraEn`, guarda la prerreserva pendiente en `sessionStorage` y confirma compra usando el `tokenEntrada` real.
+- Corregido `EmailService` de `esiusuarios`: el correo de reset incluye enlace directo a `http://localhost:4000/reset-password?token=...`, acepta `app.mail.from` y cae a consola si SMTP no esta configurado o falla.
+- Validaciones realizadas: builds de los tres proyectos, reset email en consola, prerreserva correcta, segundo bloqueo `409`, compra con otro usuario `409`, compra correcta `VENDIDA`, reintento con mismo token `404` y prueba en navegador hasta compra definitiva.

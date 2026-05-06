@@ -8,6 +8,7 @@ import jakarta.persistence.LockModeType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,4 +29,24 @@ public interface EntradaDao extends JpaRepository<Entrada, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Entrada e where e.id = :idEntrada")
     Optional<Entrada> findByIdForUpdate(@Param("idEntrada") Long idEntrada);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from Entrada e where e.tokenPrerreserva = :tokenEntrada")
+    Optional<Entrada> findByTokenPrerreservaForUpdate(@Param("tokenEntrada") String tokenEntrada);
+
+    @Modifying
+    @Query("""
+        update Entrada e
+        set e.estado = :estadoDisponible,
+            e.tokenPrerreserva = null,
+            e.prerreservaExpiraEn = null,
+            e.usuarioPrerreserva = null
+        where e.estado = :estadoPrerreservada
+          and e.prerreservaExpiraEn < :now
+        """)
+    int liberarPrerreservasExpiradas(
+        @Param("estadoDisponible") Estado estadoDisponible,
+        @Param("estadoPrerreservada") Estado estadoPrerreservada,
+        @Param("now") java.time.LocalDateTime now
+    );
 }

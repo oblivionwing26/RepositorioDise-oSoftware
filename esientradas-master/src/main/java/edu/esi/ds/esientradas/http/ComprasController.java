@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import edu.esi.ds.esientradas.dto.DtoCompra;
+import edu.esi.ds.esientradas.services.ComprasService;
 import edu.esi.ds.esientradas.services.UsuariosService;
 
 @RestController
@@ -17,8 +19,11 @@ public class ComprasController {
     @Autowired
     private UsuariosService usuariosService;
 
+    @Autowired
+    private ComprasService comprasService;
+
     @PutMapping("/comprar")
-    public String comprar ( 
+    public DtoCompra comprar ( 
         @RequestParam String tokenEntrada,
         @RequestParam String tokenUsuario) {
         if (tokenUsuario == null || tokenUsuario.isBlank()) {
@@ -34,7 +39,7 @@ public class ComprasController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token de usuario inválido");
         }
 
-        return "Compra autorizada para el usuario: " + userEmail + " con la entrada: " + tokenEntrada;
+        return this.comprasService.comprar(tokenEntrada, userEmail);
     }
 
 }
