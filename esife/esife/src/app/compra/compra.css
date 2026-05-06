@@ -1,0 +1,53 @@
+.compra {
+  max-width: 720px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+.compra__panel {
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fff;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+dt {
+  color: #667085;
+  font-size: 0.85rem;
+}
+
+dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+button {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.ok {
+  color: #027a48;
+}
+
+.error {
+  color: #b42318;
+}
+
+.muted {
+  color: #667085;
+}
+
+.pago-simulado {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+}

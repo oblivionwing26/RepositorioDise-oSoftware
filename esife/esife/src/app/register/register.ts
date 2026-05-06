@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component } from "@angular/core";
+import { ChangeDetectorRef, Component } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
 import { Auth } from "../services/auth";
@@ -19,10 +19,10 @@ export class Register {
   loading = false;
   ok = false;
 
-  constructor(private auth: Auth, private router: Router) {}
+  constructor(private auth: Auth, private router: Router, private cdr: ChangeDetectorRef) {}
 
   private validClient(p: string): boolean{
-    return p.length >= 8 && /[A-Z]/.test(p) && /[a-z]/.test(p) && /\d/.test(p);
+    return p.length >= 8 && /[A-Za-z]/.test(p) && /\d/.test(p);
   }
   
   submit(): void {
@@ -34,7 +34,7 @@ export class Register {
       return;
     }
     if (!this.validClient(this.password)) {
-      this.error = 'La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas y números.';
+      this.error = 'La contraseña debe tener al menos 8 caracteres, incluir letras y números.';
       return;
     }
 
@@ -43,6 +43,7 @@ export class Register {
       next: () => {
         this.loading = false;
         this.ok = true;
+        this.cdr.detectChanges();
         setTimeout(() => this.router.navigate(['/login']), 1200);
       },
       error: err => {
@@ -50,8 +51,9 @@ export class Register {
         this.error = err.status === 409
           ? 'El correo ya está registrado.'
           : err.status === 400
-            ? 'Datos inváidos. Revisa email y contraseña. '
+            ? 'Datos inválidos. Revisa email y contraseña.'
             : 'Error al registrar la cuenta.';
+          this.cdr.detectChanges();
       }
     });
   }

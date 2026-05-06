@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { ChangeDetectorRef, Component, OnInit } from "@angular/core";
 import { FormsModule
  } from "@angular/forms";
 
@@ -21,7 +21,12 @@ export class ResetPassword implements OnInit {
   ok = false;
   loading = false;
 
-  constructor(private route: ActivatedRoute, private router: Router, private auth: Auth) {}
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private auth: Auth,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit(): void {
     this.token = this.route.snapshot.queryParamMap.get('token') ?? ''; 
@@ -49,6 +54,7 @@ export class ResetPassword implements OnInit {
       next: () => {
         this.loading = false;
         this.ok = true;
+        this.cdr.detectChanges();
         setTimeout(() => this.router.navigate(['/login']), 1200);
       },
       error: err => {
@@ -56,6 +62,7 @@ export class ResetPassword implements OnInit {
         this.error = err.status === 401
           ? 'Token inválido o expirado.'
           : 'No se pudo restablecer la contraseña.';
+        this.cdr.detectChanges();
       }
     });
   } 

@@ -1,12 +1,54 @@
-<p>compra works!</p>
+<section class="compra">
+  <h1>Compra</h1>
 
-Importe: <input type="number" [(ngModel)]="importe">
-<button (click)="irAlPago()">Ir al Pago</button>
+  <p *ngIf="!entrada" class="error">
+    No hay ninguna entrada seleccionada.
+    <a routerLink="/">Volver a espectáculos</a>
+  </p>
 
-<br>
+  <article *ngIf="entrada" class="compra__panel">
+    <h2>{{ espectaculo?.artista ?? 'Entrada seleccionada' }}</h2>
+    <p *ngIf="espectaculo" class="muted">{{ espectaculo.fecha }} · {{ espectaculo.escenario }}</p>
 
-<div *ngIf="clientSecret">
-  Datos de tarjeta: 4242 4242 4242 4242<br>
-  Fecha de caducidad: 12/34<br>
-  CVC: 123<br>
-</div>
+    <dl>
+      <div>
+        <dt>Entrada</dt>
+        <dd>#{{ entrada.id }}</dd>
+      </div>
+      <div>
+        <dt>Tipo</dt>
+        <dd>{{ entrada.tipo }}</dd>
+      </div>
+      <div *ngIf="entrada.zona != null">
+        <dt>Zona</dt>
+        <dd>{{ entrada.zona }}</dd>
+      </div>
+      <div *ngIf="entrada.planta != null">
+        <dt>Ubicación</dt>
+        <dd>Planta {{ entrada.planta }}, fila {{ entrada.fila }}, butaca {{ entrada.columna }}</dd>
+      </div>
+      <div>
+        <dt>Precio</dt>
+        <dd>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</dd>
+      </div>
+    </dl>
+
+    <button type="button" (click)="comprar()" [disabled]="loading">
+      {{ loading ? 'Validando...' : 'Comprar entrada' }}
+    </button>
+
+    <button type="button" (click)="irAlPago()" [disabled]="loading">
+      Preparar pago simulado
+    </button>
+  </article>
+
+  <p *ngIf="mensaje" class="ok">{{ mensaje }}</p>
+  <p *ngIf="error" class="error">{{ error }}</p>
+
+  <div *ngIf="clientSecret" class="pago-simulado">
+    Datos de tarjeta: 4242 4242 4242 4242<br>
+    Fecha de caducidad: 12/34<br>
+    CVC: 123<br>
+    Client secret: {{ clientSecret }}
+  </div>
+</section>

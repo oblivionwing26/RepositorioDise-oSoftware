@@ -10,9 +10,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import edu.esi.ds.esientradas.services.UsuariosService;
 
-import java.io.IOException;
-
-
 @RestController
 @RequestMapping("/compras")
 public class ComprasController {

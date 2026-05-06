@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Auth } from '../services/auth';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
@@ -19,7 +19,12 @@ export class Login {
   error: string | null = null;
   loading = false;
 
-  constructor(private auth: Auth, private router: Router) {}
+  constructor(
+    private auth: Auth,
+    private router: Router,
+    private route: ActivatedRoute,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   submit(): void{
     this.error = null;
@@ -28,13 +33,15 @@ export class Login {
       next: res => {
         this.auth.saveToken(res.token);
         this.loading = false;
-        this.router.navigate(['/']);
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        this.router.navigateByUrl(returnUrl?.startsWith('/') ? returnUrl : '/');
       },
       error: err => {
         this.loading = false;
         this.error = err.status ===401
         ? 'Credenciales inválidas o cuenta desactivada.'
         : 'Error al iniciar sesión.';
+        this.cdr.detectChanges();
       }
     });
   }

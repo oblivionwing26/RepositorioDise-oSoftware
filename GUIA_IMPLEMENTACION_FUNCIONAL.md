@@ -2176,25 +2176,25 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - [x] Cambiar `UserService.checkToken(...)` para validar JWT real en vez de usar usuarios de prueba en memoria.
 - [x] Revisar `ExternalController`: debe exponer una ruta clara, por ejemplo `/external/checktoken/{token}`.
 - [x] Confirmar que `esientradas` llama exactamente a esa ruta desde `UsuariosService`.
-- [ ] Probar compra con token JWT real generado por `/users/login`.
-- [ ] Evitar que `esientradas` conozca la base de datos de usuarios; solo debe llamar a `esiusuarios`.
+- [x] Probar compra con token JWT real generado por `/users/login`.
+- [x] Evitar que `esientradas` conozca la base de datos de usuarios; solo debe llamar a `esiusuarios`.
 
 ### Checklist frontend de sesion
 
 - [x] Probar `/register` desde navegador despues del fix de CORS.
-- [ ] Probar `/login` y confirmar que guarda `jwt` en `localStorage`.
-- [ ] Mostrar errores de backend en formularios de forma clara.
-- [ ] Proteger acciones de compra: si no hay JWT, redirigir a `/login`.
+- [x] Probar `/login` y confirmar que guarda `jwt` en `localStorage`.
+- [x] Mostrar errores de backend en formularios de forma clara.
+- [x] Proteger acciones de compra: si no hay JWT, redirigir a `/login`.
 - [x] Revisar que los nombres de respuesta coinciden: Angular espera `token` y `expiresIn`.
 - [ ] Unificar estilos de `login`, `register`, `forgot-password` y `reset-password`.
 
 ### Checklist de entradas y disponibilidad
 
-- [ ] Revisar modelo `Entrada` actual y estados existentes.
-- [ ] Definir estados finales: `LIBRE`, `PRERRESERVADA`, `VENDIDA`.
-- [ ] Añadir endpoints para listar entradas libres por espectaculo.
-- [ ] Diseñar vista de seleccion de entradas segun tipo de recinto: zona, fila, butaca, planta.
-- [ ] Evitar doble venta con transacciones o bloqueo pesimista/optimista.
+- [x] Revisar modelo `Entrada` actual y estados existentes.
+- [x] Definir estados finales: se mantiene `DISPONIBLE` como equivalente actual de `LIBRE`, se anade `PRERRESERVADA`, se conserva `RESERVADA` por compatibilidad y `VENDIDA` queda para compra final.
+- [x] Añadir endpoints para listar entradas libres por espectaculo.
+- [x] Diseñar vista de seleccion de entradas segun tipo de recinto: zona, fila, butaca, planta.
+- [x] Evitar doble venta con transacciones o bloqueo pesimista/optimista.
 
 ### Checklist de prerreserva
 
@@ -2265,3 +2265,13 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - Restaurados `forgot-password` y `reset-password` con token temporal hasheado en base de datos y fallback de email por consola.
 - Implementada cancelacion de cuenta con `Authorization: Bearer ...`, dejando el usuario inactivo y bloqueando logins posteriores.
 - Validaciones manuales realizadas: registro `200`, email repetido `409`, password debil `400`, login incorrecto `401`, login correcto con `expiresIn`, `/external/checktoken/{token}` `200`, reset completo `200`, cancelacion `200` y login posterior `401`.
+
+### Resumen de fase: JWT, sesion y disponibilidad
+
+- Confirmado que `esientradas` solo integra usuarios mediante HTTP contra `esiusuarios`: no tiene DAO ni datasource hacia SQL Server de usuarios.
+- Probado flujo backend real: registro, `/users/login`, `/external/checktoken/{token}`, compra autorizada desde `esientradas` con JWT real y rechazo `401` con token invalido.
+- Anadido listado de entradas disponibles con DTO seguro (`DtoEntradaDisponible`) y resumen de estados desde JPA, sin exponer entidades polimorficas al frontend.
+- Corregido `/busqueda/getNumeroDeEntradasComoDto/{idEspectaculo}` para usar el path variable real y anadido `/busqueda/getEntradasDisponibles/{idEspectaculo}`.
+- La seleccion de entradas en Angular carga escenarios, espectaculos, resumen y entradas libres; si no hay sesion guarda la seleccion, redirige a login y vuelve a `/comprar` tras guardar el JWT.
+- Configurado el SSR de Angular con `allowedHosts` para `localhost` y `127.0.0.1`, evitando el fallback por proteccion SSRF al abrir `http://localhost:4000`.
+- Validaciones realizadas: `mvnw clean compile` en `esiusuarios` y `esientradas-master`, `npm run build`, consulta real de disponibilidad (`total=1007`, `libres=1007`) y prueba en navegador hasta compra autorizada.

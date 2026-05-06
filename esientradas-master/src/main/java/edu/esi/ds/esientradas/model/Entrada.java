@@ -64,6 +64,30 @@ public abstract class Entrada {
         this.precio = precio;
     }
 
+    public String getTokenPrerreserva() {
+        return tokenPrerreserva;
+    }
+
+    public void setTokenPrerreserva(String tokenPrerreserva) {
+        this.tokenPrerreserva = tokenPrerreserva;
+    }
+
+    public LocalDateTime getPrerreservaExpiraEn() {
+        return prerreservaExpiraEn;
+    }
+
+    public void setPrerreservaExpiraEn(LocalDateTime prerreservaExpiraEn) {
+        this.prerreservaExpiraEn = prerreservaExpiraEn;
+    }
+
+    public String getUsuarioPrerreserva() {
+        return usuarioPrerreserva;
+    }
+
+    public void setUsuarioPrerreserva(String usuarioPrerreserva) {
+        this.usuarioPrerreserva = usuarioPrerreserva;
+    }
+
     public Token getToken() {
         return token;
     }

@@ -1,18 +1,52 @@
-<h1>Espectáculos</h1>
-<button (click)="getEscenarios()"> Ver escenarios</button>
+<section class="catalogo">
+  <header class="catalogo__header">
+    <h1>Espectáculos</h1>
+    <button type="button" (click)="getEscenarios()" [disabled]="loadingEscenarios">
+      {{ loadingEscenarios ? 'Cargando...' : 'Actualizar' }}
+    </button>
+  </header>
 
-<ol>
-    <li *ngFor="let escenario of escenarios">
-        
-        <span (click)="getEspectaculos(escenario)">{{ escenario.nombre }} - {{ escenario.descripcion }}</span>
-        <ul>
-            <li *ngFor="let espectaculo of escenario.espectaculos">
-                {{ espectaculo.artista }} - {{ espectaculo.fecha }} ({{ espectaculo.escenario }})
-                <span (click)="getNumeroDeEntradas(espectaculo)"> Ver entradas disponibles</span>
-                <span *ngIf="espectaculo.entradas != null">
-                    - Hay {{ espectaculo.entradas.total }} entradas y <a (click)="irAComprarEntradas()">hay</a> {{ espectaculo.entradas.libres }} entradas libres
-                </span>
-            </li>
-        </ul>
+  <p *ngIf="error" class="error">{{ error }}</p>
+
+  <ol class="escenarios">
+    <li *ngFor="let escenario of escenarios" class="escenario">
+      <button type="button" class="escenario__button" (click)="getEspectaculos(escenario)">
+        <strong>{{ escenario.nombre }}</strong>
+        <span>{{ escenario.descripcion }}</span>
+      </button>
+
+      <p *ngIf="escenario.loading" class="muted">Cargando espectáculos...</p>
+
+      <ul *ngIf="escenario.espectaculos?.length" class="espectaculos">
+        <li *ngFor="let espectaculo of escenario.espectaculos" class="espectaculo">
+          <div class="espectaculo__main">
+            <span class="espectaculo__title">{{ espectaculo.artista }}</span>
+            <span class="muted">{{ espectaculo.fecha }} · {{ espectaculo.escenario }}</span>
+            <button type="button" (click)="getNumeroDeEntradas(espectaculo)" [disabled]="espectaculo.loadingEntradas">
+              {{ espectaculo.loadingEntradas ? 'Cargando...' : 'Ver entradas' }}
+            </button>
+          </div>
+
+          <section *ngIf="espectaculo.entradas" class="disponibilidad">
+            <div class="resumen">
+              <span>Total: {{ espectaculo.entradas.total }}</span>
+              <span>Libres: {{ espectaculo.entradas.libres }}</span>
+              <span>Reservadas: {{ espectaculo.entradas.reservadas }}</span>
+              <span>Vendidas: {{ espectaculo.entradas.vendidas }}</span>
+            </div>
+
+            <p *ngIf="!espectaculo.entradasDisponibles?.length" class="muted">No hay entradas libres para este espectáculo.</p>
+
+            <ul *ngIf="espectaculo.entradasDisponibles?.length" class="entradas">
+              <li *ngFor="let entrada of espectaculo.entradasDisponibles" class="entrada">
+                <span>{{ etiquetaEntrada(entrada) }}</span>
+                <span>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
+                <button type="button" (click)="seleccionarEntrada(espectaculo, entrada)">Comprar</button>
+              </li>
+            </ul>
+          </section>
+        </li>
+      </ul>
     </li>
-</ol>
+  </ol>
+</section>
