@@ -55,7 +55,7 @@ Añade en tu `esiusuarios/pom.xml` (dentro de `<dependencies>`) si no está ya:
 </dependency>
 ```
 
-> El email de recuperación se envía **al correo del propio usuario que lo solicita** (es el requisito real de “olvidé mi contraseña”). En el `EmailService` mantenemos un *fallback* a consola si el SMTP no está configurado, para que la defensa no se rompa si falla la red.
+> El email de recuperación se envía **al correo del propio usuario que lo solicita**. Si SMTP no está configurado, el endpoint sigue respondiendo sin revelar si la cuenta existe, pero **no se imprime el token por consola**.
 
 ---
 
@@ -102,8 +102,8 @@ spring.mail.properties.mail.smtp.starttls.required=true
 app.mail.from=tu_correo@gmail.com
 ```
 
-> **Importante:** si dejas `spring.mail.username` o `app.mail.from` vacíos, el `EmailService`
-> detecta que SMTP no está configurado y cae automáticamente al modo consola (no rompe la app).
+> **Importante:** si dejas `spring.mail.username`, `spring.mail.password` o `app.mail.from` vacíos, el `EmailService`
+> detecta que SMTP no está configurado y no enviará el correo real. Ya no se imprimen tokens ni entradas por consola.
 
 **Por qué:**
 - Externalizamos el `secret` del JWT (antes estaba *hardcoded* en `JwtService`, eso es un fallo OWASP A02).
@@ -512,7 +512,7 @@ public class EmailService {
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     // JavaMailSender lo crea Spring automaticamente cuando spring.mail.host esta configurado.
-    // required=false -> si no hay SMTP configurado, no rompe la app y caemos a consola.
+    // required=false -> si no hay SMTP configurado, no rompe la app ni imprime tokens.
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
@@ -521,8 +521,8 @@ public class EmailService {
 
     /**
      * Envia el token de recuperacion al correo del usuario que lo solicito.
-     * - Si SMTP esta configurado (spring.mail.* + app.mail.from), envia un email real.
-     * - Si no, lo imprime por consola (modo demo / fallback para la defensa).
+      * - Si SMTP esta configurado (spring.mail.* + app.mail.from), envia un email real.
+      * - Si no, solo registra un aviso sin imprimir el token.
      */
     public void sendResetEmail(String to, String token) {
         String subject = "Recuperacion de contrasena - ESI Entradas";
@@ -533,13 +533,7 @@ public class EmailService {
             + "Si tu no has solicitado este cambio, ignora este correo.\n";
 
         if (mailSender == null || from == null || from.isBlank()) {
-            // Fallback: SMTP no configurado -> log por consola.
-            log.warn("SMTP no configurado (spring.mail.* / app.mail.from). Mostrando email por consola.");
-            log.info("=== EMAIL RECUPERACION (modo consola) ===");
-            log.info("Para:    {}", to);
-            log.info("Asunto:  {}", subject);
-            log.info("Cuerpo:\n{}", body);
-            log.info("=========================================");
+            log.warn("SMTP no configurado (spring.mail.* / app.mail.from). No se envia email real.");
             return;
         }
 
@@ -561,7 +555,7 @@ public class EmailService {
 ```
 
 **Por qué así:**
-- `JavaMailSender` se inyecta como `required=false`: si en `application.properties` no rellenas `spring.mail.*`, la app **no peta**, simplemente cae al modo consola.
+- `JavaMailSender` se inyecta como `required=false`: si en `application.properties` no rellenas `spring.mail.*`, la app **no peta**, pero no se manda correo real ni se imprime el token.
 - El email se manda **al `to` que recibimos**, que en `UserService.forgotPassword` es `user.getEmail()` → es decir, **al correo del usuario que pidió el reset** (no a una cuenta fija).
 - Capturamos cualquier excepción de SMTP y solo la logueamos: el endpoint `/forgot-password` **siempre** debe responder `200`, aunque el email falle, para no revelar si la cuenta existe (defensa anti *user enumeration*, OWASP).
 
@@ -1095,12 +1089,12 @@ curl -X POST http://localhost:8081/users/forgot-password ^
   -d "{\"email\":\"ana@uclm.es\"}"
 ```
 
-Mira la **consola** de `esiusuarios`: aparecerá el token de reset.
+Revisa el correo del usuario: debe llegar un enlace a `/reset-password?token=...`. Si no llega, falta configuracion SMTP real.
 
 ```bash
 curl -X POST http://localhost:8081/users/reset-password ^
   -H "Content-Type: application/json" ^
-  -d "{\"token\":\"EL_TOKEN_DE_LA_CONSOLA\",\"newPassword\":\"NuevaPwd9\"}"
+  -d "{\"token\":\"EL_TOKEN_DEL_EMAIL\",\"newPassword\":\"NuevaPwd9\"}"
 ```
 
 Repite el paso → debe dar `401` ("usado").
@@ -1656,7 +1650,7 @@ Abre `http://localhost:4200`:
 
 1. `/register` → crea una cuenta.
 2. `/login` → entra. Mira `localStorage.jwt` en DevTools.
-3. `/forgot-password` → mira la consola del backend `esiusuarios`: aparece el `RESET TOKEN` (o llega por SMTP si lo configuraste).
+3. `/forgot-password` → revisa la bandeja del usuario; si no llega, falta configurar SMTP.
 4. Visita `http://localhost:4200/reset-password?token=ESE_TOKEN` → cambia la contraseña.
 5. Vuelve a `/login` y entra con la nueva contraseña.
 6. Desde `/comprar`, simula la compra: si no hay token, te manda al login; si hay, va a `esientradas` que valida contra `esiusuarios`.
@@ -1673,7 +1667,7 @@ Cuando termines, debes poder demostrar punto por punto:
 - [ ] `POST /users/register` rechaza contraseñas <8, sin letra o sin número (`400`).
 - [ ] `POST /users/login` con credenciales correctas devuelve un JWT firmado.
 - [ ] `GET /external/checktoken/{jwt}` devuelve el email; con JWT inválido → `401`; vacío → `400`.
-- [ ] `POST /users/forgot-password` genera un token, lo guarda **hasheado**, y "lo envía" (consola).
+- [ ] `POST /users/forgot-password` genera un token, lo guarda **hasheado**, y lo envia por SMTP sin imprimirlo por consola.
 - [ ] `POST /users/reset-password` cambia la contraseña; un segundo intento con el mismo token → `401`.
 - [ ] `PUT /compras/comprar` rechaza la compra sin `tokenUsuario` válido y la acepta con ambos tokens.
 - [ ] `DELETE /users/me` con JWT válido marca la cuenta como `active=false` y bloquea futuros logins.
@@ -1995,7 +1989,7 @@ Objetivo: cuando una compra termina correctamente, el usuario recibe un correo c
 Crea `CompraEmailService` con dos modos:
 
 - Si `spring.mail.host` está configurado: enviar email real.
-- Si no está configurado: imprimir el email por consola para pruebas.
+- Si no está configurado: registrar un aviso, sin imprimir la entrada ni el token por consola.
 
 Contenido mínimo:
 
@@ -2111,7 +2105,7 @@ public PaymentResult cobrar(Long cantidadCentimos, String descripcion, String to
 Mientras no haya API key:
 
 - Aceptar `tokenPago=SIMULADO`.
-- Registrar en consola: `Pago simulado aprobado`.
+- Registrar el pago simulado en la tabla `pago` sin llamar a Stripe.
 - Mantener el mismo flujo para que luego cambiar a Stripe real sea pequeño.
 
 ---
@@ -2120,7 +2114,7 @@ Mientras no haya API key:
 
 1. Prerreserva sin cola y sin Stripe.
 2. Compra definitiva con `tokenEntrada + tokenUsuario`.
-3. Email post-compra en modo consola.
+3. Email post-compra por SMTP.
 4. Vista frontend para seleccionar entrada y confirmar compra.
 5. Cola virtual con polling.
 6. Stripe simulado.
@@ -2149,7 +2143,7 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - Fase de estabilizacion inmediata completada: `esientradas` tiene CORS global para `localhost:4000` y `localhost:4200`, los dos backends compilan con Maven y el frontend compila con `npm run build`.
 - Fase de autenticacion y usuarios completada: eliminado `/users/login1`, registro/login usan SQL Server, JWT real, validacion de password/email, reset por token temporal, cancelacion por Bearer token y `/external/checktoken/{token}` devuelve el email del usuario autenticado.
 - Se permitio `/error` en Spring Security para que los errores reales lleguen al cliente como `400`, `401` o `409`, en vez de quedar convertidos en `403`.
-- Email de recuperacion corregido: genera enlace directo a `/reset-password?token=...`, soporta `app.mail.from` y mantiene modo consola si SMTP no esta configurado o falla.
+- Email de recuperacion corregido: genera enlace directo a `/reset-password?token=...`, soporta `app.mail.from` y requiere SMTP real para que llegue a bandeja; ya no imprime tokens por consola.
 
 ### Checklist de estabilizacion inmediata
 
@@ -2212,17 +2206,17 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - [x] Cambiar compra para exigir `tokenEntrada` y `tokenUsuario`.
 - [x] Validar que el token de entrada existe, no ha expirado y pertenece al usuario.
 - [x] Marcar entrada como `VENDIDA` solo al final del flujo.
-- [ ] Registrar datos minimos de la compra.
+- [x] Registrar datos minimos de la compra.
 - [x] Devolver una respuesta util para Angular: estado, entrada comprada, precio y mensaje.
 - [x] Probar compra correcta, token expirado, token de otro usuario y entrada ya vendida.
 
 ### Checklist de email tras compra
 
-- [ ] Crear servicio de email en `esientradas`.
-- [ ] Modo consola si no hay SMTP configurado.
-- [ ] Enviar confirmacion solo tras compra guardada.
-- [ ] Incluir datos de espectaculo, escenario, ubicacion, precio y codigo de entrada.
-- [ ] No deshacer compra si falla el email; registrar el error.
+- [x] Crear servicio de email en `esientradas`.
+- [x] Configuracion SMTP por entorno; si falta SMTP no se imprime la entrada por consola.
+- [x] Enviar confirmacion solo tras compra guardada.
+- [x] Incluir datos de espectaculo, escenario, ubicacion, precio y codigo de entrada.
+- [x] No deshacer compra si falla el email; registrar el error.
 
 ### Checklist de cola virtual
 
@@ -2236,15 +2230,15 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 
 ### Checklist de Stripe / pagos
 
-- [ ] Implementar primero modo simulado con `tokenPago=SIMULADO`.
-- [ ] Separar servicio de pagos de la logica de compra.
-- [ ] Guardar referencia de pago simulada o real.
-- [ ] Integrar Stripe real solo cuando prerreserva, compra y email funcionen.
-- [ ] Mantener configuracion por properties para no subir claves al repositorio.
+- [x] Implementar primero modo simulado con `tokenPago=SIMULADO`.
+- [x] Separar servicio de pagos de la logica de compra.
+- [x] Guardar referencia de pago simulada o real.
+- [x] Integrar Stripe real mediante PaymentIntent cuando haya claves configuradas.
+- [x] Mantener configuracion por properties para no subir claves al repositorio.
 
 ### Checklist de pruebas y entrega
 
-- [ ] Preparar secuencia demo: registrar usuario, login, ver espectaculo, prerreservar, comprar, recibir email en consola.
+- [ ] Preparar secuencia demo: registrar usuario, login, ver espectaculo, prerreservar, pagar con Stripe test, comprar, recibir email por SMTP.
 - [ ] Añadir datos de prueba suficientes en MySQL.
 - [ ] Revisar que SQL Server arranca y crea tablas limpias.
 - [x] Preparar comandos de arranque para los tres servicios.
@@ -2263,7 +2257,7 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - Reemplazado el login legacy en memoria por registro/login persistido en SQL Server con BCrypt, validacion de email/password, usuario activo por defecto y errores HTTP claros.
 - `JwtService` ahora genera y valida JWT; `UserService.checkToken` comprueba JWT real, usuario existente y usuario activo.
 - `users.email` queda protegido con la constraint unica `ux_users_email`; se verifico con `sqlcmd` que existe en SQL Server y que un segundo registro del mismo email devuelve `409`.
-- Restaurados `forgot-password` y `reset-password` con token temporal hasheado en base de datos y fallback de email por consola.
+- Restaurados `forgot-password` y `reset-password` con token temporal hasheado en base de datos; el envio real depende de SMTP y ya no se imprime el token por consola.
 - Implementada cancelacion de cuenta con `Authorization: Bearer ...`, dejando el usuario inactivo y bloqueando logins posteriores.
 - Validaciones manuales realizadas: registro `200`, email repetido `409`, password debil `400`, login incorrecto `401`, login correcto con `expiresIn`, `/external/checktoken/{token}` `200`, reset completo `200`, cancelacion `200` y login posterior `401`.
 
@@ -2284,5 +2278,25 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - Activado `@EnableScheduling` y liberacion automatica de prerreservas expiradas cada minuto; se limpian token, usuario y expiracion.
 - Anadido `schema.sql` en `esientradas` para ampliar el enum MySQL `entrada.estado` con `PRERRESERVADA`; sin esta migracion MySQL truncaba el valor y devolvia `500`.
 - Angular crea la prerreserva al entrar en `/comprar`, muestra `expiraEn`, guarda la prerreserva pendiente en `sessionStorage` y confirma compra usando el `tokenEntrada` real.
-- Corregido `EmailService` de `esiusuarios`: el correo de reset incluye enlace directo a `http://localhost:4000/reset-password?token=...`, acepta `app.mail.from` y cae a consola si SMTP no esta configurado o falla.
-- Validaciones realizadas: builds de los tres proyectos, reset email en consola, prerreserva correcta, segundo bloqueo `409`, compra con otro usuario `409`, compra correcta `VENDIDA`, reintento con mismo token `404` y prueba en navegador hasta compra definitiva.
+- Corregido `EmailService` de `esiusuarios`: el correo de reset incluye enlace directo a `http://localhost:4000/reset-password?token=...`, acepta `app.mail.from`, requiere SMTP real y no imprime el token en consola si falta configuracion.
+- Validaciones realizadas: builds de los tres proyectos, prerreserva correcta, segundo bloqueo `409`, compra con otro usuario `409`, compra correcta `VENDIDA`, reintento con mismo token `404` y prueba en navegador hasta compra definitiva.
+
+### Resumen de fase: compra formal, email y pago simulado
+
+- Anadida entidad `Compra` y `CompraDao`: cada compra guarda entrada, pago, email del usuario, precio, codigo de entrada, espectaculo, escenario, ubicacion, estado y referencia de pago.
+- Ampliado `Pago` con moneda, metodo, `tokenPago`, descripcion y fecha de confirmacion; `/pagos/prepararPago` devuelve JSON con `idPago`, `tokenPago`, `clientSecret`, estado y metodo.
+- `ComprasService` confirma el pago simulado antes de vender, guarda `Compra`, marca la entrada como `VENDIDA` y devuelve un `DtoCompra` con `idCompra`, codigo, referencia de pago, metodo, estado de pago y estado del email.
+- Creado `CompraEmailService` en `esientradas`: envia confirmacion por SMTP si esta configurado; si SMTP falta o falla, registra el error sin deshacer la compra y sin imprimir la entrada por consola.
+- Quitado el `@CrossOrigin("*")` local de `PagosController` porque chocaba con el CORS global con credenciales; ahora usa la configuracion global de origenes explicitos.
+- Angular obliga a preparar pago antes de confirmar compra, conserva `tokenPago` en `sessionStorage`, envia `tokenEntrada + tokenUsuario + tokenPago` y muestra codigo de entrada, estado del pago y si el email fue enviado por SMTP.
+- Validaciones realizadas: `mvnw clean compile` en `esientradas`, `npm run build`, flujo HTTP completo `prerreservar -> prepararPago -> comprar`, fila real en `compra` y `pago` confirmado en MySQL.
+
+### Resumen de fase: Stripe real y SMTP sin consola
+
+- `PagosService` crea un PaymentIntent real de Stripe cuando `STRIPE_SECRET_KEY` y `STRIPE_PUBLIC_KEY` estan configuradas; en ese caso `tokenPago` es el `payment_intent.id` y el `clientSecret` se devuelve al frontend.
+- La compra definitiva valida contra Stripe antes de vender: recupera el PaymentIntent, exige importe/moneda correctos y estado `succeeded`, y solo entonces marca la entrada como `VENDIDA`.
+- Si no hay claves de Stripe, se conserva el fallback `SIMULADO` para desarrollo local, pero ya no es el camino principal cuando hay configuracion real.
+- La pantalla de compra carga Stripe.js, monta el campo de tarjeta y exige `Pagar con Stripe` antes de habilitar `Comprar entrada`.
+- `EmailService` y `CompraEmailService` dejan de imprimir tokens o entradas por consola; para que los correos lleguen hay que configurar SMTP real con `SPRING_MAIL_*` y `APP_MAIL_FROM`.
+- Las claves de Stripe y SMTP quedan fuera del repositorio y se leen por variables de entorno.
+- Validaciones realizadas: `mvnw clean compile` en `esientradas-master`, `mvnw clean compile` en `esiusuarios` y `npm run build` en `esife/esife`.

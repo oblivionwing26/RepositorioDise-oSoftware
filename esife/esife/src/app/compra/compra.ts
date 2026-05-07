@@ -1,13 +1,52 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { Pagos } from '../pagos';
+import { PagoPreparadoResponse, Pagos } from '../pagos';
 import { Auth } from '../services/auth';
 import { CompraResponse, ComprasService } from '../services/compras';
 import { PrerreservaResponse, ReservasService } from '../services/reservas';
 import { EntradaDisponible, EspectaculoDto } from '../espectaculos';
+
+interface StripeCardChangeEvent {
+  complete?: boolean;
+  error?: { message?: string };
+}
+
+interface StripeCardElement {
+  mount(target: string | HTMLElement): void;
+  destroy(): void;
+  on(event: 'change', handler: (event: StripeCardChangeEvent) => void): void;
+}
+
+interface StripeElements {
+  create(type: 'card', options?: Record<string, unknown>): StripeCardElement;
+}
+
+interface StripePaymentIntent {
+  id: string;
+  status: string;
+}
+
+interface StripeConfirmResult {
+  error?: { message?: string };
+  paymentIntent?: StripePaymentIntent;
+}
+
+interface StripeInstance {
+  elements(): StripeElements;
+  confirmCardPayment(
+    clientSecret: string,
+    options: { payment_method: { card: StripeCardElement } },
+  ): Promise<StripeConfirmResult>;
+}
+
+declare global {
+  interface Window {
+    Stripe?: (publicKey: string) => StripeInstance;
+  }
+}
 
 @Component({
   selector: 'app-compra',
@@ -15,18 +54,27 @@ import { EntradaDisponible, EspectaculoDto } from '../espectaculos';
   templateUrl: './compra.html',
   styleUrl: './compra.css',
 })
-export class Compra implements OnInit {
+export class Compra implements OnInit, OnDestroy {
   private readonly COMPRA_STORAGE_KEY = 'compraPendiente';
+  private stripe?: StripeInstance;
+  private stripeCard?: StripeCardElement;
+  private stripeScriptPromise?: Promise<void>;
   clientSecret = '';
   importe = 0;
   entrada?: EntradaDisponible;
   espectaculo?: EspectaculoDto;
   prerreserva?: PrerreservaResponse;
+  pagoPreparado?: PagoPreparadoResponse;
   compra?: CompraResponse;
   mensaje: string | null = null;
   error: string | null = null;
   loading = false;
   loadingPrerreserva = false;
+  loadingPago = false;
+  confirmandoStripe = false;
+  stripeCardComplete = false;
+  stripeError: string | null = null;
+  stripeMensaje: string | null = null;
 
   constructor(
     private pagosService: Pagos,
@@ -36,6 +84,10 @@ export class Compra implements OnInit {
     private router: Router,
     private cdr: ChangeDetectorRef,
   ) {}
+
+  ngOnDestroy(): void {
+    this.destruirFormularioStripe();
+  }
 
   ngOnInit(): void {
     if (!this.auth.isLogged()) {
@@ -123,15 +175,30 @@ export class Compra implements OnInit {
       return;
     }
 
+    if (!this.pagoPreparado?.tokenPago) {
+      this.error = 'Prepara el pago antes de confirmar la compra.';
+      return;
+    }
+
+    if (!this.pagoListoParaComprar()) {
+      this.error = 'Completa el pago con Stripe antes de confirmar la compra.';
+      return;
+    }
+
     this.loading = true;
-    this.comprasService.comprar(this.prerreserva.tokenEntrada, tokenUsuario).subscribe({
+    this.comprasService.comprar(this.prerreserva.tokenEntrada, tokenUsuario, this.pagoPreparado.tokenPago).subscribe({
       next: compra => {
         this.compra = compra;
         this.mensaje = compra.mensaje;
+        if (this.pagoPreparado) {
+          this.pagoPreparado.estado = compra.estadoPago;
+          this.pagoPreparado.metodo = compra.metodoPago;
+        }
         if (this.entrada) {
           this.entrada.estado = compra.estado;
         }
         this.limpiarCompraPendiente();
+        this.destruirFormularioStripe();
         this.loading = false;
         this.cdr.detectChanges();
       },
@@ -163,11 +230,17 @@ export class Compra implements OnInit {
         entrada?: EntradaDisponible;
         espectaculo?: EspectaculoDto;
         prerreserva?: PrerreservaResponse;
+        pagoPreparado?: PagoPreparadoResponse;
       };
       this.entrada = compraPendiente.entrada;
       this.espectaculo = compraPendiente.espectaculo;
       if (compraPendiente.prerreserva && this.prerreservaActiva(compraPendiente.prerreserva)) {
         this.prerreserva = compraPendiente.prerreserva;
+        this.pagoPreparado = compraPendiente.pagoPreparado;
+        this.clientSecret = compraPendiente.pagoPreparado?.clientSecret ?? '';
+        if (this.esPagoStripePendiente()) {
+          setTimeout(() => this.montarFormularioStripe(), 0);
+        }
       }
     } catch {
       sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
@@ -185,6 +258,7 @@ export class Compra implements OnInit {
         entrada: this.entrada,
         espectaculo: this.espectaculo,
         prerreserva: this.prerreserva,
+        pagoPreparado: this.pagoPreparado,
       }),
     );
   }
@@ -207,19 +281,162 @@ export class Compra implements OnInit {
   }
 
   irAlPago(): void {
+    this.error = null;
+    this.stripeError = null;
+    this.stripeMensaje = null;
+
+    if (!this.prerreserva) {
+      this.error = 'Primero hay que prerreservar la entrada.';
+      return;
+    }
+
     const jsonData = {
       centimos: Math.floor(this.importe.valueOf() * 100),
     };
 
+    this.loadingPago = true;
     this.pagosService.prepararPago(jsonData).subscribe({
-      next: response => {
-        this.clientSecret = response;
+      next: pago => {
+        this.pagoPreparado = pago;
+        this.clientSecret = pago.clientSecret;
+        this.loadingPago = false;
+        this.guardarCompraPendiente();
+        if (this.esPagoStripePendiente()) {
+          setTimeout(() => this.montarFormularioStripe(), 0);
+        }
         this.cdr.detectChanges();
       },
       error: () => {
+        this.loadingPago = false;
         this.error = 'Error al preparar el pago.';
         this.cdr.detectChanges();
       },
     });
+  }
+
+  pagoListoParaComprar(): boolean {
+    if (!this.pagoPreparado) {
+      return false;
+    }
+    return !this.esPagoStripe() || this.pagoPreparado.estado === 'CONFIRMADO';
+  }
+
+  esPagoStripe(): boolean {
+    return this.pagoPreparado?.metodo === 'STRIPE';
+  }
+
+  async confirmarPagoStripe(): Promise<void> {
+    this.error = null;
+    this.stripeError = null;
+    this.stripeMensaje = null;
+
+    if (!this.pagoPreparado || !this.clientSecret || !this.stripe || !this.stripeCard) {
+      this.stripeError = 'El formulario de Stripe no esta listo.';
+      return;
+    }
+
+    this.confirmandoStripe = true;
+    this.cdr.detectChanges();
+
+    try {
+      const result = await this.stripe.confirmCardPayment(this.clientSecret, {
+        payment_method: { card: this.stripeCard },
+      });
+
+      if (result.error) {
+        this.stripeError = result.error.message ?? 'Stripe ha rechazado el pago.';
+        return;
+      }
+
+      if (result.paymentIntent?.status !== 'succeeded') {
+        this.stripeError = 'Stripe todavia no ha completado el pago.';
+        return;
+      }
+
+      this.pagoPreparado.estado = 'CONFIRMADO';
+      this.pagoPreparado.tokenPago = result.paymentIntent.id;
+      this.stripeMensaje = 'Pago confirmado por Stripe.';
+      this.guardarCompraPendiente();
+    } catch {
+      this.stripeError = 'No se pudo confirmar el pago con Stripe.';
+    } finally {
+      this.confirmandoStripe = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private esPagoStripePendiente(): boolean {
+    return this.esPagoStripe() && this.pagoPreparado?.estado !== 'CONFIRMADO';
+  }
+
+  private montarFormularioStripe(): void {
+    if (!this.pagoPreparado?.publicKey) {
+      this.stripeError = 'Falta la clave publica de Stripe.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.destruirFormularioStripe();
+    this.stripeCardComplete = false;
+
+    this.cargarStripe(this.pagoPreparado.publicKey)
+      .then(stripe => {
+        this.stripe = stripe;
+        const elements = stripe.elements();
+        this.stripeCard = elements.create('card', { hidePostalCode: true });
+        this.stripeCard.mount('#stripe-card-element');
+        this.stripeCard.on('change', event => {
+          this.stripeCardComplete = !!event.complete;
+          this.stripeError = event.error?.message ?? null;
+          this.cdr.detectChanges();
+        });
+      })
+      .catch(() => {
+        this.stripeError = 'No se pudo cargar Stripe.';
+        this.cdr.detectChanges();
+      });
+  }
+
+  private cargarStripe(publicKey: string): Promise<StripeInstance> {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return Promise.reject(new Error('Stripe solo se puede cargar en navegador'));
+    }
+
+    if (window.Stripe) {
+      return Promise.resolve(window.Stripe(publicKey));
+    }
+
+    if (!this.stripeScriptPromise) {
+      this.stripeScriptPromise = new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector<HTMLScriptElement>('script[src="https://js.stripe.com/v3/"]');
+        if (existing) {
+          existing.addEventListener('load', () => resolve(), { once: true });
+          existing.addEventListener('error', () => reject(new Error('No se pudo cargar Stripe')), { once: true });
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://js.stripe.com/v3/';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('No se pudo cargar Stripe'));
+        document.head.appendChild(script);
+      });
+    }
+
+    return this.stripeScriptPromise.then(() => {
+      if (!window.Stripe) {
+        throw new Error('Stripe no esta disponible');
+      }
+      return window.Stripe(publicKey);
+    });
+  }
+
+  private destruirFormularioStripe(): void {
+    if (!this.stripeCard) {
+      return;
+    }
+    this.stripeCard.destroy();
+    this.stripeCard = undefined;
   }
 }

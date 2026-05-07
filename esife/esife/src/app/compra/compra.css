@@ -45,9 +45,28 @@ button {
   color: #667085;
 }
 
+.pago-stripe,
 .pago-simulado {
   margin-top: 16px;
+  margin-bottom: 12px;
   padding: 12px;
   border: 1px solid #d7dce2;
   border-radius: 6px;
+}
+
+.pago-stripe h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.stripe-card {
+  padding: 12px;
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }

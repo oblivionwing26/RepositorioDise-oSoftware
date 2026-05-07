@@ -25,7 +25,8 @@ public class ComprasController {
     @PutMapping("/comprar")
     public DtoCompra comprar ( 
         @RequestParam String tokenEntrada,
-        @RequestParam String tokenUsuario) {
+        @RequestParam String tokenUsuario,
+        @RequestParam(required = false, defaultValue = "SIMULADO") String tokenPago) {
         if (tokenUsuario == null || tokenUsuario.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "El token del usuario es requerido");
         }
@@ -39,7 +40,7 @@ public class ComprasController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token de usuario inválido");
         }
 
-        return this.comprasService.comprar(tokenEntrada, userEmail);
+        return this.comprasService.comprar(tokenEntrada, userEmail, tokenPago);
     }
 
 }

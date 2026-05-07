@@ -22,14 +22,23 @@ public class EmailService {
     @Value("${app.mail.from:${app.email.from:}}")
     private String from;
 
+    @Value("${spring.mail.host:}")
+    private String smtpHost;
+
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
+
+    @Value("${spring.mail.password:}")
+    private String smtpPassword;
+
     @Value("${app.reset.expiration-minutes:15}")
     private long resetExpirationMinutes;
 
     @Value("${app.reset.frontend-url:http://localhost:4000/reset-password}")
     private String resetFrontendUrl;
 
-    //Envía el token de recuperacion al correo solicitante, si SMPT no está configurado,
-    //se muestra el token en consola, si lo está el flujo sigue con normalidad}
+    // Envia el token de recuperacion al correo solicitante. Si SMTP no esta configurado,
+    // no se imprime el token en consola por seguridad.
 
     public void sendResetEmail(String to, String token){
         String subject = "Recuperación de contraseña - ESI Usuarios";
@@ -46,16 +55,16 @@ public class EmailService {
             + token + "\n\n"
             + "El token es valido por " + resetExpirationMinutes + " minutos.\n\n";
 
-        if (mailSender == null) {
-            log.warn("SMTP no configurado (spring.mail.*). Mostrando email por consola.");
-            logEmailConsola(to, subject, body);
+        if (!smtpConfigurado()) {
+            log.warn("SMTP no configurado correctamente. No se envio email de recuperacion a {}.", to);
             return;
         }
 
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
-            if (from != null && !from.isBlank()) {
-                msg.setFrom(from);
+            String remitente = remitente();
+            if (!remitente.isBlank()) {
+                msg.setFrom(remitente);
             }
             msg.setTo(to);
             msg.setSubject(subject);
@@ -66,16 +75,21 @@ public class EmailService {
             // No relanzamos: el endpoint /forgot-password debe seguir devolviendo 200
             // para no revelar si el email existe (anti user-enumeration).
             log.error("Fallo al enviar email a {}: {}", to, ex.getMessage());
-            log.warn("Mostrando email de recuperacion por consola tras fallo SMTP.");
-            logEmailConsola(to, subject, body);
+            log.warn("No se muestra el token de recuperacion por consola.");
         }
     }
 
-    private void logEmailConsola(String to, String subject, String body) {
-        log.info("=== EMAIL RECUPERACION (modo consola) ===");
-        log.info("Para:    {}", to);
-        log.info("Asunto:  {}", subject);
-        log.info("Cuerpo:\n{}", body);
-        log.info("=========================================");
+    private boolean smtpConfigurado() {
+        return mailSender != null
+            && smtpHost != null && !smtpHost.isBlank()
+            && smtpUsername != null && !smtpUsername.isBlank()
+            && smtpPassword != null && !smtpPassword.isBlank();
+    }
+
+    private String remitente() {
+        if (from != null && !from.isBlank()) {
+            return from;
+        }
+        return smtpUsername == null ? "" : smtpUsername;
     }
 }

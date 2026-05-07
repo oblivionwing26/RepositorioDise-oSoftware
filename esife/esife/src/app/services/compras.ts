@@ -3,10 +3,16 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 export interface CompraResponse {
+  idCompra: number;
   idEntrada: number;
   precio: number;
   estado: string;
   emailUsuario: string;
+  codigoEntrada: string;
+  referenciaPago: string;
+  metodoPago: string;
+  estadoPago: string;
+  emailConfirmacionEnviado: boolean;
   mensaje: string;
 }
 
@@ -16,10 +22,11 @@ export class ComprasService {
 
   constructor(private http: HttpClient) {}
 
-  comprar(tokenEntrada: string, tokenUsuario: string): Observable<CompraResponse> {
+  comprar(tokenEntrada: string, tokenUsuario: string, tokenPago: string): Observable<CompraResponse> {
     const params = new HttpParams()
       .set('tokenEntrada', tokenEntrada)
-      .set('tokenUsuario', tokenUsuario);
+      .set('tokenUsuario', tokenUsuario)
+      .set('tokenPago', tokenPago);
 
     return this.http.put<CompraResponse>(`${this.COMPRAS_API}/comprar`, null, {
       params,
