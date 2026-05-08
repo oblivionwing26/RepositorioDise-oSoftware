@@ -27,6 +27,9 @@ public class ReservasService {
     @Autowired
     private TokenDao tokenDao;
 
+    @Autowired
+    private ColaService colaService;
+
     @Value("${app.prerreserva.expiration-minutes:10}")
     private long prerreservaExpirationMinutes;
 
@@ -52,7 +55,7 @@ public class ReservasService {
     }
 
     @Transactional
-    public DtoPrerreserva prerreservar(Long idEntrada, String email) {
+    public DtoPrerreserva prerreservar(Long idEntrada, String email, Long idTurno) {
         if (idEntrada == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El id de entrada es requerido");
         }
@@ -62,6 +65,8 @@ public class ReservasService {
 
         Entrada entrada = this.entradaDao.findByIdForUpdate(idEntrada)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entrada no encontrada"));
+
+        this.colaService.validarTurnoActivo(entrada.getEspectaculo().getId(), email, idTurno);
 
         LocalDateTime now = LocalDateTime.now();
         if (entrada.getEstado() == Estado.PRERRESERVADA && prerreservaExpirada(entrada, now)) {
@@ -83,6 +88,8 @@ public class ReservasService {
         entrada.setPrerreservaExpiraEn(expiraEn);
         entrada.setUsuarioPrerreserva(email);
         this.entradaDao.save(entrada);
+
+        this.colaService.finalizarTurnoActivo(entrada.getEspectaculo().getId(), email, idTurno);
 
         return new DtoPrerreserva(entrada.getId(), tokenEntrada, expiraEn, entrada.getPrecio());
     }

@@ -15,11 +15,13 @@ export class ReservasService {
 
   constructor(private http: HttpClient) {}
 
-  prerreservar(idEntrada: number, tokenUsuario: string): Observable<PrerreservaResponse> {
+  prerreservar(idEntrada: number, tokenUsuario: string, idTurno?: number): Observable<PrerreservaResponse> {
     const params = new HttpParams()
       .set('idEntrada', idEntrada)
       .set('tokenUsuario', tokenUsuario);
 
-    return this.http.put<PrerreservaResponse>(`${this.RESERVAS_API}/prerreservar`, null, { params });
+    const paramsConTurno = idTurno == null ? params : params.set('idTurno', idTurno);
+
+    return this.http.put<PrerreservaResponse>(`${this.RESERVAS_API}/prerreservar`, null, { params: paramsConTurno });
   }
 }

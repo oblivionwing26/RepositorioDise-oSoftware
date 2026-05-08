@@ -46,7 +46,8 @@ button {
 }
 
 .pago-stripe,
-.pago-simulado {
+.pago-simulado,
+.cola-virtual {
   margin-top: 16px;
   margin-bottom: 12px;
   padding: 12px;
@@ -54,6 +55,7 @@ button {
   border-radius: 6px;
 }
 
+.cola-virtual h3,
 .pago-stripe h3 {
   margin: 0 0 12px;
   font-size: 1rem;

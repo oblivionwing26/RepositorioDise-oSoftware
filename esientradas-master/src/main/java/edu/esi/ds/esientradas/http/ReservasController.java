@@ -38,8 +38,9 @@ public class ReservasController {
     @PutMapping("/prerreservar")
     public DtoPrerreserva prerreservar(
             @RequestParam Long idEntrada,
-            @RequestParam String tokenUsuario) {
+            @RequestParam String tokenUsuario,
+            @RequestParam(required = false) Long idTurno) {
         String email = this.usuariosService.checkToken(tokenUsuario);
-        return this.service.prerreservar(idEntrada, email);
+        return this.service.prerreservar(idEntrada, email, idTurno);
     }
 }

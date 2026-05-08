@@ -342,18 +342,18 @@ package edu.esi.ds.esiusuarios.dto;
 
 public class LoginResponse {
     private String token;
-    private long expiresInMs;
+    private long expiresIn;
 
     public LoginResponse() {}
-    public LoginResponse(String token, long expiresInMs) {
+    public LoginResponse(String token, long expiresIn) {
         this.token = token;
-        this.expiresInMs = expiresInMs;
+        this.expiresIn = expiresIn;
     }
 
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }
-    public long getExpiresInMs() { return expiresInMs; }
-    public void setExpiresInMs(long expiresInMs) { this.expiresInMs = expiresInMs; }
+    public long getExpiresIn() { return expiresIn; }
+    public void setExpiresIn(long expiresIn) { this.expiresIn = expiresIn; }
 }
 ```
 
@@ -1067,7 +1067,7 @@ curl -X POST http://localhost:8081/users/login ^
   -d "{\"email\":\"ana@uclm.es\",\"password\":\"Secreta123\"}"
 ```
 
-Esperado: JSON con `token` (JWT) y `expiresInMs`.
+Esperado: JSON con `token` (JWT) y `expiresIn`.
 
 ### 12.3 Validar token desde el otro backend
 
@@ -1097,12 +1097,12 @@ curl -X POST http://localhost:8081/users/reset-password ^
   -d "{\"token\":\"EL_TOKEN_DEL_EMAIL\",\"newPassword\":\"NuevaPwd9\"}"
 ```
 
-Repite el paso → debe dar `401` ("usado").
+Repite el paso → debe dar error (`400`, token no valido o expirado/usado).
 
 ### 12.5 Cancelar cuenta
 
 ```bash
-curl -X DELETE http://localhost:8081/users/me ^
+curl -X DELETE http://localhost:8081/users/cancel ^
   -H "Authorization: Bearer EL_JWT"
 ```
 
@@ -1151,7 +1151,7 @@ import { Observable } from 'rxjs';
 
 export interface LoginResponse {
   token: string;
-  expiresInMs: number;
+  expiresIn: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -1659,20 +1659,20 @@ Abre `http://localhost:4200`:
 
 ## Paso 14. Checklist de defensa
 
-Cuando termines, debes poder demostrar punto por punto:
+Estado actualizado tras la revisión del código:
 
-- [ ] La tabla `users` se crea sola en SQL Server al arrancar (`ddl-auto=update`).
-- [ ] La tabla `password_reset_token` se crea con FK a `users`.
-- [ ] No hay ninguna contraseña en claro en BD: solo `password_hash` (BCrypt empieza por `$2a$`).
-- [ ] `POST /users/register` rechaza contraseñas <8, sin letra o sin número (`400`).
-- [ ] `POST /users/login` con credenciales correctas devuelve un JWT firmado.
-- [ ] `GET /external/checktoken/{jwt}` devuelve el email; con JWT inválido → `401`; vacío → `400`.
-- [ ] `POST /users/forgot-password` genera un token, lo guarda **hasheado**, y lo envia por SMTP sin imprimirlo por consola.
-- [ ] `POST /users/reset-password` cambia la contraseña; un segundo intento con el mismo token → `401`.
-- [ ] `PUT /compras/comprar` rechaza la compra sin `tokenUsuario` válido y la acepta con ambos tokens.
-- [ ] `DELETE /users/me` con JWT válido marca la cuenta como `active=false` y bloquea futuros logins.
-- [ ] `SecurityConfig` solo deja anónimas las 5 rutas listadas en el paso 10.
-- [ ] CORS configurado: el frontend en `http://localhost:4200` puede llamar sin error de navegador.
+- [x] La tabla `users` se crea sola en SQL Server al arrancar (`ddl-auto=update`) y `schema.sql` asegura el índice único de email si falta.
+- [x] La tabla `password_reset_token` se crea con FK a `users`.
+- [x] No hay ninguna contraseña en claro en BD: solo `password_hash` con BCrypt.
+- [x] `POST /users/register` rechaza email inválido, contraseñas débiles y emails duplicados (`400` / `409`).
+- [x] `POST /users/login` con credenciales correctas devuelve un JWT firmado y `expiresIn`.
+- [x] `GET /external/checktoken/{jwt}` devuelve el email; con JWT inválido devuelve `401`.
+- [x] `POST /users/forgot-password` genera un token, lo guarda **hasheado**, y lo envia por SMTP sin imprimirlo por consola.
+- [x] `POST /users/reset-password` cambia la contraseña y marca el token como usado.
+- [x] `PUT /compras/comprar` rechaza la compra sin `tokenUsuario` válido y la acepta con `tokenEntrada`, `tokenUsuario` y pago preparado.
+- [x] `DELETE /users/cancel` con JWT válido marca la cuenta como `active=false` y bloquea futuros logins.
+- [x] `SecurityConfig` permite las rutas públicas necesarias y deja `/users/cancel` accesible para que `UserService` valide manualmente el Bearer token.
+- [x] CORS configurado: el frontend en `http://localhost:4000` y `http://localhost:4200` puede llamar sin error de navegador.
 
 ---
 
@@ -1855,12 +1855,12 @@ Ya hechos por ti / por el setup:
 - ✅ `services/auth.ts` generado (vacío, hay que pegar el código del paso 13.1).
 - ✅ `app.routes.ts` actualizado con las 4 rutas de autenticación.
 
-Pendiente de tu lado:
+Estado actual:
 
-- [ ] Pegar el código de cada componente en sus 3 archivos (`.ts`, `.html`, `.css`).
-- [ ] Pegar el código del servicio `Auth` en `services/auth.ts`.
-- [ ] (Opcional) Añadir la barra de navegación del paso 13.7 en `app.html` / `app.ts`.
-- [ ] Modificar `compra.ts` para enviar `tokenUsuario` (paso 13.6).
+- [x] Código pegado en los componentes de autenticación (`login`, `register`, `forgot-password`, `reset-password`).
+- [x] Servicio `Auth` implementado en `services/auth.ts`.
+- [x] Barra de navegación añadida en `app.html` / `app.ts`.
+- [x] `compra.ts` envia `tokenUsuario`, prepara pago, gestiona Stripe y confirma compra con `tokenEntrada`.
 
 ---
 
@@ -2220,13 +2220,15 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 
 ### Checklist de cola virtual
 
-- [ ] Definir entidad de turno de cola.
-- [ ] Crear endpoint para entrar en cola.
-- [ ] Crear endpoint para consultar posicion/estado.
-- [ ] Crear endpoint para finalizar o consumir turno.
-- [ ] Permitir prerreserva solo con turno activo cuando el espectaculo requiera cola.
-- [ ] Implementar primero con polling desde Angular.
-- [ ] Valorar WebSocket al final si queda tiempo.
+- [x] Definir entidad de turno de cola (`TurnoCola`) y estados (`EstadoTurnoCola`).
+- [x] Crear DAO/repositorio de turnos de cola (`TurnoColaDao`).
+- [x] Crear endpoint para entrar en cola: `POST /cola/entrar?idEspectaculo&tokenUsuario`.
+- [x] Crear endpoint para consultar posicion/estado: `GET /cola/estado/{idTurno}?tokenUsuario`.
+- [x] Crear endpoint para finalizar o consumir turno: `POST /cola/finalizar/{idTurno}?tokenUsuario`.
+- [x] Permitir prerreserva solo con turno `ACTIVO` cuando la cola esta habilitada.
+- [x] Finalizar automaticamente el turno activo cuando la prerreserva se crea correctamente.
+- [x] Implementar polling desde Angular cada 5 segundos antes de crear la prerreserva.
+- [x] Dejar WebSocket como mejora opcional; la version base queda resuelta con polling.
 
 ### Checklist de Stripe / pagos
 
@@ -2300,3 +2302,49 @@ A partir de este punto cambiamos la forma de trabajo: la guía deja de ser un si
 - `EmailService` y `CompraEmailService` dejan de imprimir tokens o entradas por consola; para que los correos lleguen hay que configurar SMTP real con `SPRING_MAIL_*` y `APP_MAIL_FROM`.
 - Las claves de Stripe y SMTP quedan fuera del repositorio y se leen por variables de entorno.
 - Validaciones realizadas: `mvnw clean compile` en `esientradas-master`, `mvnw clean compile` en `esiusuarios` y `npm run build` en `esife/esife`.
+
+### Checklist actualizado tras revision del codigo (2026-05-08)
+
+Revision ejecutada sobre el repositorio y validada con:
+
+- [x] `mvnw clean compile` en `esiusuarios`.
+- [x] `mvnw clean compile` en `esientradas-master`.
+- [x] `npm run build` en `esife/esife`.
+
+Implementado y confirmado en codigo:
+
+- [x] Registro, login, JWT real, validacion contra `esiusuarios` y cancelacion de cuenta.
+- [x] Recuperacion de contrasena por token temporal hasheado y email SMTP.
+- [x] Listado de espectaculos/entradas disponibles y seleccion desde Angular.
+- [x] Cola virtual con `TurnoCola`, estados `ESPERANDO`, `ACTIVO`, `EXPIRADO`, `FINALIZADO` y endpoints `/cola`.
+- [x] Polling Angular de cola desde la pantalla de compra antes de prerreservar.
+- [x] Prerreserva con `tokenEntrada`, expiracion, propietario y liberacion automatica.
+- [x] Compra definitiva con `tokenEntrada + tokenUsuario + tokenPago`.
+- [x] Registro de compra y pago en backend.
+- [x] Email de confirmacion tras compra, sin deshacer la compra si falla SMTP.
+- [x] Pago simulado y Stripe real mediante PaymentIntent cuando hay claves configuradas.
+- [x] Configuracion externa de Stripe/SMTP mediante `.env` y `.env.example`.
+
+Cola virtual implementada:
+
+- [x] `POST /cola/entrar` crea o reutiliza turno abierto para el usuario autenticado.
+- [x] `GET /cola/estado/{idTurno}` recalcula expiraciones, posiciones y promociona turnos.
+- [x] `POST /cola/finalizar/{idTurno}` libera el turno y promociona al siguiente.
+- [x] `ReservasService.prerreservar(...)` exige `idTurno` activo si `app.cola.enabled=true`.
+- [x] `app.cola.active-minutes`, `app.cola.active-slots` y `app.cola.cleanup-rate-ms` quedan configurables por properties.
+- [x] Angular conserva `turnoCola` en `sessionStorage`, muestra posicion/estado y consulta cada 5 segundos.
+
+Falta por preparar para la entrega/demo:
+
+- [ ] Crear o documentar datos de prueba suficientes para MySQL (`escenario`, `espectaculo`, `entrada`, zonas/butacas).
+- [ ] Preparar una secuencia demo completa: registrar usuario, login, ver espectaculo, entrar en cola, prerreservar, pagar con Stripe test, comprar y recibir email SMTP.
+- [ ] Probar desde cero con bases vacias o documentar claramente que datos iniciales hacen falta.
+- [ ] Verificar en SQL Server limpio que se crean `users`, `password_reset_token` y el indice unico de email.
+- [ ] Revisar memoria virtual/archivo de paginacion de Windows solo si se quiere recuperar `ng serve`; `npm run build` funciona.
+- [ ] Unificar estilos visuales de `login`, `register`, `forgot-password` y `reset-password` si se quiere dejar el frontend mas pulido.
+
+Notas de documentacion corregidas:
+
+- [x] Donde la guia antigua decia `DELETE /users/me`, se corrigio a la ruta real actual: `DELETE /users/cancel`.
+- [x] Donde la guia antigua decia `expiresInMs`, se corrigio a la respuesta real actual: `expiresIn`.
+- [x] Aclarado que `/users/cancel` aparece permitido en `SecurityConfig` porque el Bearer token se valida manualmente en `UserService`.

@@ -35,6 +35,10 @@
         <dt>Prerreserva</dt>
         <dd>Hasta {{ prerreserva.expiraEn }}</dd>
       </div>
+      <div *ngIf="turnoCola && !prerreserva">
+        <dt>Cola</dt>
+        <dd>{{ turnoCola.estado }}<span *ngIf="turnoCola.estado === 'ESPERANDO'"> · posición {{ turnoCola.posicion }}</span></dd>
+      </div>
       <div *ngIf="compra">
         <dt>Estado</dt>
         <dd>{{ compra.estado }}</dd>
@@ -53,6 +57,17 @@
       </div>
     </dl>
 
+    <section *ngIf="turnoCola && !prerreserva && !compra" class="cola-virtual">
+      <h3>Cola virtual</h3>
+      <p>{{ turnoCola.mensaje }}</p>
+      <p *ngIf="turnoCola.estado === 'ESPERANDO'" class="muted">Posición actual: {{ turnoCola.posicion }}. La página se actualizará automáticamente.</p>
+      <p *ngIf="turnoCola.estado === 'ACTIVO' && turnoCola.activoHasta" class="ok">Turno activo hasta {{ turnoCola.activoHasta }}.</p>
+      <button *ngIf="turnoCola.estado === 'EXPIRADO' || turnoCola.estado === 'FINALIZADO'" type="button" (click)="entrarEnCola()" [disabled]="loadingCola">
+        Entrar de nuevo
+      </button>
+    </section>
+
+    <p *ngIf="loadingCola" class="muted">Entrando en la cola virtual...</p>
     <p *ngIf="loadingPrerreserva" class="muted">Creando prerreserva...</p>
 
     <p *ngIf="prerreserva && !compra" class="ok">
@@ -74,11 +89,11 @@
       Pago simulado preparado. Se confirmara al completar la compra.
     </div>
 
-    <button type="button" (click)="comprar()" [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !pagoPreparado || !pagoListoParaComprar() || !!compra">
+    <button type="button" (click)="comprar()" [disabled]="loading || loadingCola || loadingPrerreserva || loadingPago || !prerreserva || !pagoPreparado || !pagoListoParaComprar() || !!compra">
       {{ loading ? 'Comprando...' : 'Comprar entrada' }}
     </button>
 
-    <button type="button" (click)="irAlPago()" [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !!pagoPreparado || !!compra">
+    <button type="button" (click)="irAlPago()" [disabled]="loading || loadingCola || loadingPrerreserva || loadingPago || !prerreserva || !!pagoPreparado || !!compra">
       {{ loadingPago ? 'Preparando...' : 'Preparar pago' }}
     </button>
   </article>
