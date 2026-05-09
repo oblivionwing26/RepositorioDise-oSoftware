@@ -12,6 +12,11 @@ import {
   EspectaculosService,
 } from '../espectaculos';
 
+interface ItemCarrito {
+  espectaculo: EspectaculoDto;
+  entrada: EntradaDisponible;
+}
+
 @Component({
   selector: 'espectaculos',
   imports: [CommonModule, FormsModule],
@@ -19,6 +24,9 @@ import {
   styleUrl: './espectaculos.css',
 })
 export class Espectaculos implements OnInit {
+  carrito: ItemCarrito[] = [];
+  mensajeCarrito: string | null = null;
+
   private readonly COMPRA_STORAGE_KEY = 'compraPendiente';
   escenarios: EscenarioDto[] = [];
   error: string | null = null;
@@ -40,6 +48,145 @@ export class Espectaculos implements OnInit {
 
   ngOnInit(): void {
     this.getEscenarios();
+    this.cargarCompraPendiente();
+  }
+
+  estaSeleccionada(entrada: EntradaDisponible): boolean {
+    return this.carrito.some(item => item.entrada.id === entrada.id);
+  }
+
+  toggleEntrada(espectaculo: EspectaculoDto, entrada: EntradaDisponible): void {
+    this.mensajeCarrito = null;
+
+    if (this.estaSeleccionada(entrada)) {
+      this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
+      this.guardarCarrito();
+      return;
+    }
+
+    if (this.carrito.length > 0 && this.carrito[0].espectaculo.id !== espectaculo.id) {
+      this.mensajeCarrito = 'Solo puedes seleccionar entradas del mismo espectáculo en una compra.';
+      return;
+    }
+
+    const espectaculoSeleccionado: EspectaculoDto = {
+      id: espectaculo.id,
+      artista: espectaculo.artista,
+      fecha: espectaculo.fecha,
+      escenario: espectaculo.escenario,
+    };
+
+    this.carrito = [
+      ...this.carrito,
+      {
+        espectaculo: espectaculoSeleccionado,
+        entrada,
+      },
+    ];
+
+    this.guardarCarrito();
+  }
+
+  quitarDelCarrito(entrada: EntradaDisponible): void {
+    this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
+    this.guardarCarrito();
+  }
+
+  vaciarCarrito(): void {
+    this.carrito = [];
+    this.mensajeCarrito = null;
+
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+    }
+  }
+
+  totalCarritoCentimos(): number {
+    return this.carrito.reduce((total, item) => total + item.entrada.precio, 0);
+  }
+
+  comprarCarrito(): void {
+    if (!this.carrito.length) {
+      this.mensajeCarrito = 'Selecciona al menos una entrada antes de comprar.';
+      return;
+    }
+
+    this.guardarCarrito();
+
+    if (!this.auth.isLogged()) {
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
+      return;
+    }
+
+    const espectaculo = this.carrito[0].espectaculo;
+    const entradas = this.carrito.map(item => item.entrada);
+
+    this.router.navigate(['/comprar'], {
+      state: {
+        espectaculo,
+        entrada: entradas[0],     // compatibilidad con la compra antigua
+        entradas,                 // nueva compra múltiple
+        items: this.carrito,
+        total: this.totalCarritoCentimos(),
+      },
+    });
+  }
+
+  private guardarCarrito(): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+
+    if (!this.carrito.length) {
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+      return;
+    }
+
+    const espectaculo = this.carrito[0].espectaculo;
+    const entradas = this.carrito.map(item => item.entrada);
+
+    sessionStorage.setItem(
+      this.COMPRA_STORAGE_KEY,
+      JSON.stringify({
+        espectaculo,
+        entrada: entradas[0],   // compatibilidad con código anterior
+        entradas,
+        items: this.carrito,
+        total: this.totalCarritoCentimos(),
+      }),
+    );
+  }
+
+  private cargarCompraPendiente(): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+
+    const raw = sessionStorage.getItem(this.COMPRA_STORAGE_KEY);
+
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const data = JSON.parse(raw);
+
+      if (Array.isArray(data.items)) {
+        this.carrito = data.items;
+        return;
+      }
+
+      if (data.espectaculo && data.entrada) {
+        this.carrito = [
+          {
+            espectaculo: data.espectaculo,
+            entrada: data.entrada,
+          },
+        ];
+      }
+    } catch {
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+    }
   }
 
   getEscenarios(): void {

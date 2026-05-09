@@ -41,6 +41,46 @@
   </form>
 
   <p *ngIf="error" class="error">{{ error }}</p>
+  
+  <p *ngIf="mensajeCarrito" class="error">{{ mensajeCarrito }}</p>
+
+  <section *ngIf="carrito.length" class="carrito">
+    <h2>Entradas seleccionadas</h2>
+
+    <ul>
+      <li *ngFor="let item of carrito">
+        <div>
+          <strong>{{ item.espectaculo.artista }}</strong>
+          <span class="muted">
+            {{ item.espectaculo.fecha }} · {{ item.espectaculo.escenario }}
+          </span>
+          <span>
+            {{ etiquetaEntrada(item.entrada) }} ·
+            {{ item.entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}
+          </span>
+        </div>
+
+        <button type="button" (click)="quitarDelCarrito(item.entrada)">
+          Quitar
+        </button>
+      </li>
+    </ul>
+
+    <div class="carrito__total">
+      <strong>Total:</strong>
+      <span>{{ totalCarritoCentimos() / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
+    </div>
+
+    <div class="carrito__actions">
+      <button type="button" (click)="vaciarCarrito()">
+        Vaciar selección
+      </button>
+
+      <button type="button" (click)="comprarCarrito()">
+        Comprar selección
+      </button>
+    </div>
+  </section>
 
   <section *ngIf="busquedaRealizada" class="resultados-busqueda">
     <h2>Resultados de búsqueda</h2>
@@ -125,7 +165,9 @@
               <li *ngFor="let entrada of espectaculo.entradasDisponibles" class="entrada">
                 <span>{{ etiquetaEntrada(entrada) }}</span>
                 <span>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
-                <button type="button" (click)="seleccionarEntrada(espectaculo, entrada)">Comprar</button>
+                <button type="button" (click)="toggleEntrada(espectaculo, entrada)">
+                  {{ estaSeleccionada(entrada) ? 'Quitar' : 'Seleccionar' }}
+                </button>
               </li>
             </ul>
           </section>
