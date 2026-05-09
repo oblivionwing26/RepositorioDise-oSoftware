@@ -1,12 +1,104 @@
-<p>compra works!</p>
+<section class="compra">
+  <h1>Compra</h1>
 
-Importe: <input type="number" [(ngModel)]="importe">
-<button (click)="irAlPago()">Ir al Pago</button>
+  <p *ngIf="!entrada" class="error">
+    No hay ninguna entrada seleccionada.
+    <a routerLink="/">Volver a espectáculos</a>
+  </p>
 
-<br>
+  <article *ngIf="entrada" class="compra__panel">
+    <h2>{{ espectaculo?.artista ?? 'Entrada seleccionada' }}</h2>
+    <p *ngIf="espectaculo" class="muted">{{ espectaculo.fecha }} · {{ espectaculo.escenario }}</p>
 
-<div *ngIf="clientSecret">
-  Datos de tarjeta: 4242 4242 4242 4242<br>
-  Fecha de caducidad: 12/34<br>
-  CVC: 123<br>
-</div>
+    <dl>
+      <div>
+        <dt>Entrada</dt>
+        <dd>#{{ entrada.id }}</dd>
+      </div>
+      <div>
+        <dt>Tipo</dt>
+        <dd>{{ entrada.tipo }}</dd>
+      </div>
+      <div *ngIf="entrada.zona != null">
+        <dt>Zona</dt>
+        <dd>{{ entrada.zona }}</dd>
+      </div>
+      <div *ngIf="entrada.planta != null">
+        <dt>Ubicación</dt>
+        <dd>Planta {{ entrada.planta }}, fila {{ entrada.fila }}, butaca {{ entrada.columna }}</dd>
+      </div>
+      <div>
+        <dt>Precio</dt>
+        <dd>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</dd>
+      </div>
+      <div *ngIf="prerreserva">
+        <dt>Prerreserva</dt>
+        <dd>Hasta {{ prerreserva.expiraEn }}</dd>
+      </div>
+      <div *ngIf="turnoCola && !prerreserva">
+        <dt>Cola</dt>
+        <dd>{{ turnoCola.estado }}<span *ngIf="turnoCola.estado === 'ESPERANDO'"> · posición {{ turnoCola.posicion }}</span></dd>
+      </div>
+      <div *ngIf="compra">
+        <dt>Estado</dt>
+        <dd>{{ compra.estado }}</dd>
+      </div>
+      <div *ngIf="compra">
+        <dt>Código</dt>
+        <dd>{{ compra.codigoEntrada }}</dd>
+      </div>
+      <div *ngIf="pagoPreparado">
+        <dt>Pago</dt>
+        <dd>{{ compra?.estadoPago ?? pagoPreparado.estado }} · {{ compra?.metodoPago ?? pagoPreparado.metodo }}</dd>
+      </div>
+      <div *ngIf="compra">
+        <dt>Email</dt>
+        <dd>{{ compra.emailConfirmacionEnviado ? 'Enviado' : 'No enviado (SMTP)' }}</dd>
+      </div>
+    </dl>
+
+    <section *ngIf="turnoCola && !prerreserva && !compra" class="cola-virtual">
+      <h3>Cola virtual</h3>
+      <p>{{ turnoCola.mensaje }}</p>
+      <p *ngIf="turnoCola.estado === 'ESPERANDO'" class="muted">Posición actual: {{ turnoCola.posicion }}. La página se actualizará automáticamente.</p>
+      <p *ngIf="turnoCola.estado === 'ACTIVO' && turnoCola.activoHasta" class="ok">Turno activo hasta {{ turnoCola.activoHasta }}.</p>
+      <button *ngIf="turnoCola.estado === 'EXPIRADO' || turnoCola.estado === 'FINALIZADO'" type="button" (click)="entrarEnCola()" [disabled]="loadingCola">
+        Entrar de nuevo
+      </button>
+    </section>
+
+    <p *ngIf="loadingCola" class="muted">Entrando en la cola virtual...</p>
+    <p *ngIf="loadingPrerreserva" class="muted">Creando prerreserva...</p>
+
+    <p *ngIf="prerreserva && !compra" class="ok">
+      Entrada prerreservada. Puedes confirmar la compra antes de que expire.
+    </p>
+
+    <div *ngIf="esPagoStripe() && !compra" class="pago-stripe">
+      <h3>Pago con Stripe</h3>
+      <div id="stripe-card-element" class="stripe-card"></div>
+      <p class="muted">Tarjeta test: 4242 4242 4242 4242 · 12/34 · 123</p>
+      <button type="button" (click)="confirmarPagoStripe()" [disabled]="confirmandoStripe || !stripeCardComplete || pagoPreparado?.estado === 'CONFIRMADO'">
+        {{ confirmandoStripe ? 'Confirmando...' : (pagoPreparado?.estado === 'CONFIRMADO' ? 'Pago confirmado' : 'Pagar con Stripe') }}
+      </button>
+      <p *ngIf="stripeMensaje" class="ok">{{ stripeMensaje }}</p>
+      <p *ngIf="stripeError" class="error">{{ stripeError }}</p>
+    </div>
+
+    <div *ngIf="pagoPreparado?.metodo === 'SIMULADO' && !compra" class="pago-simulado">
+      Pago simulado preparado. Se confirmara al completar la compra.
+    </div>
+
+    <button type="button" (click)="comprar()" [disabled]="loading || loadingCola || loadingPrerreserva || loadingPago || !prerreserva || !pagoPreparado || !pagoListoParaComprar() || !!compra">
+      {{ loading ? 'Comprando...' : 'Comprar entrada' }}
+    </button>
+
+    <button type="button" (click)="irAlPago()" [disabled]="loading || loadingCola || loadingPrerreserva || loadingPago || !prerreserva || !!pagoPreparado || !!compra">
+      {{ loadingPago ? 'Preparando...' : 'Preparar pago' }}
+    </button>
+  </article>
+
+  <p *ngIf="mensaje" class="ok">{{ mensaje }}</p>
+  <p *ngIf="error" class="error">{{ error }}</p>
+
+</section>

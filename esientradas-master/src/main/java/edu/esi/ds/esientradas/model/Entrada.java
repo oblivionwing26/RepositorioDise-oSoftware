@@ -1,5 +1,7 @@
 package edu.esi.ds.esientradas.model;
 
+import java.time.LocalDateTime;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Entity;
@@ -12,6 +14,7 @@ import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.persistence.OneToOne;
 
 @Entity
@@ -20,6 +23,10 @@ public abstract class Entrada {
     @Id @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     protected Long id;
     private Long precio;     // Ojo: en céntimos de euro
+    @Column(unique = true)
+    private String tokenPrerreserva;
+    private LocalDateTime prerreservaExpiraEn;
+    private String usuarioPrerreserva;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "espectaculo_id", nullable = false)
@@ -57,6 +64,30 @@ public abstract class Entrada {
     }
     public void setPrecio(Long precio) {
         this.precio = precio;
+    }
+
+    public String getTokenPrerreserva() {
+        return tokenPrerreserva;
+    }
+
+    public void setTokenPrerreserva(String tokenPrerreserva) {
+        this.tokenPrerreserva = tokenPrerreserva;
+    }
+
+    public LocalDateTime getPrerreservaExpiraEn() {
+        return prerreservaExpiraEn;
+    }
+
+    public void setPrerreservaExpiraEn(LocalDateTime prerreservaExpiraEn) {
+        this.prerreservaExpiraEn = prerreservaExpiraEn;
+    }
+
+    public String getUsuarioPrerreserva() {
+        return usuarioPrerreserva;
+    }
+
+    public void setUsuarioPrerreserva(String usuarioPrerreserva) {
+        this.usuarioPrerreserva = usuarioPrerreserva;
     }
 
     public Token getToken() {

@@ -1,3 +1,23 @@
-<espectaculos></espectaculos>
+<div class="app-shell">
+  <nav class="topbar">
+    <a routerLink="/" class="brand" aria-label="ESI Entradas">
+      <span class="brand__mark">E</span>
+      <span class="brand__text">ESI Entradas</span>
+    </a>
 
-<router-outlet />
+    <div class="topbar__links">
+      <a routerLink="/">Cartelera</a>
+      <ng-container *ngIf="!isLogged(); else logged">
+        <a routerLink="/login">Login</a>
+        <a routerLink="/register" class="topbar__cta">Registro</a>
+      </ng-container>
+      <ng-template #logged>
+        <button type="button" class="topbar__logout" (click)="logout()">Cerrar sesión</button>
+      </ng-template>
+    </div>
+  </nav>
+
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>

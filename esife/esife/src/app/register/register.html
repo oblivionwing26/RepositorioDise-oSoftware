@@ -1,0 +1,31 @@
+<section class="auth-card">
+  <h2>Crear cuenta</h2>
+
+  <form (ngSubmit)="submit()" #f="ngForm">
+    <label>
+      Email
+      <input type="email" name="email" [(ngModel)]="email" required />
+    </label>
+
+    <label>
+      Contraseña
+      <input type="password" name="password" [(ngModel)]="password" required minlength="8" />
+    </label>
+
+    <label>
+      Repite la contraseña
+      <input type="password" name="confirm" [(ngModel)]="confirm" required />
+    </label>
+
+    <button type="submit" [disabled]="loading || !f.valid">
+      {{ loading ? 'Creando…' : 'Registrarse' }}
+    </button>
+  </form>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+  <p *ngIf="ok" class="ok">Cuenta creada. Redirigiendo al login…</p>
+
+  <p class="links">
+    ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
+  </p>
+</section>

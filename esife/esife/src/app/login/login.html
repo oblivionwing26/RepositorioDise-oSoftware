@@ -1,0 +1,26 @@
+<section class="auth-card">
+  <h2>Iniciar sesión</h2>
+
+  <form (ngSubmit)="submit()" #f="ngForm">
+    <label>
+      Email
+      <input type="email" name="email" [(ngModel)]="email" required />
+    </label>
+
+    <label>
+      Contraseña
+      <input type="password" name="password" [(ngModel)]="password" required />
+    </label>
+
+    <button type="submit" [disabled]="loading || !f.valid">
+      {{ loading ? 'Entrando…' : 'Entrar' }}
+    </button>
+  </form>
+
+  <p *ngIf="error" class="error">{{ error }}</p>
+
+  <p class="links">
+    <a routerLink="/register">Crear cuenta</a> ·
+    <a routerLink="/forgot-password">¿Olvidaste tu contraseña?</a>
+  </p>
+</section>

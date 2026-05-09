@@ -1,32 +1,72 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface EscenarioDto {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  espectaculos?: EspectaculoDto[];
+  loading?: boolean;
+}
+
+export interface EspectaculoDto {
+  id: number;
+  artista: string;
+  fecha: string;
+  escenario: string;
+  entradas?: EntradasResumen;
+  entradasDisponibles?: EntradaDisponible[];
+  loadingEntradas?: boolean;
+}
+
+export interface EntradasResumen {
+  total: number;
+  libres: number;
+  reservadas: number;
+  vendidas: number;
+}
+
+export interface EntradaDisponible {
+  id: number;
+  precio: number;
+  estado: string;
+  tipo: 'ZONA' | 'PRECISA' | 'GENERAL';
+  zona?: number;
+  fila?: number;
+  columna?: number;
+  planta?: number;
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class EspectaculosService {
-  getNumeroDeEntradas(id: any) {
-    return this.http.get(`http://localhost:8080/busqueda/getNumeroDeEntradas/${id}`);
+  private readonly BUSQUEDA_API = 'http://localhost:8080/busqueda';
+
+  constructor(private http: HttpClient) {}
+
+  getNumeroDeEntradas(idEspectaculo: number): Observable<number> {
+    return this.http.get<number>(`${this.BUSQUEDA_API}/getNumeroDeEntradas/${idEspectaculo}`);
   }
 
-    getNumeroDeEntradasComoDto(id: any) {
-    return this.http.get(`http://localhost:8080/busqueda/getNumeroDeEntradasComoDto/${id}`);
+  getNumeroDeEntradasComoDto(idEspectaculo: number): Observable<EntradasResumen> {
+    return this.http.get<EntradasResumen>(`${this.BUSQUEDA_API}/getNumeroDeEntradasComoDto/${idEspectaculo}`);
   }
 
-  getEntradasLibres(id: any) {
-    return this.http.get(`http://localhost:8080/busqueda/getEntradasLibres/${id}`);
+  getEntradasLibres(idEspectaculo: number): Observable<number> {
+    return this.http.get<number>(`${this.BUSQUEDA_API}/getEntradasLibres/${idEspectaculo}`);
   }
 
-    constructor(private http: HttpClient) {}
-
-  
-  getEspectaculos(escenario: any) {
-    return this.http.get(`http://localhost:8080/busqueda/getEspectaculos/${escenario}`);
+  getEntradasDisponibles(idEspectaculo: number): Observable<EntradaDisponible[]> {
+    return this.http.get<EntradaDisponible[]>(`${this.BUSQUEDA_API}/getEntradasDisponibles/${idEspectaculo}`);
   }
 
-  getEscenarios() {
-    return this.http.get('http://localhost:8080/busqueda/getEscenarios');
+  getEspectaculos(idEscenario: number): Observable<EspectaculoDto[]> {
+    return this.http.get<EspectaculoDto[]>(`${this.BUSQUEDA_API}/getEspectaculos/${idEscenario}`);
   }
 
-  
+  getEscenarios(): Observable<EscenarioDto[]> {
+    return this.http.get<EscenarioDto[]>(`${this.BUSQUEDA_API}/getEscenarios`);
+  }
 }

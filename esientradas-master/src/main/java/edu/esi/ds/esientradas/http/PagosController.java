@@ -1,26 +1,25 @@
 package edu.esi.ds.esientradas.http;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import edu.esi.ds.esientradas.services.PagosService;
+import edu.esi.ds.esientradas.dto.DtoPagoPreparado;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/pagos")
-@CrossOrigin(origins = "*")
 public class PagosController {
 
     @Autowired
     private PagosService service;
 
     @PostMapping("/prepararPago")
-    public String prepararPago(@RequestBody Map<String, Object> pagoData) {
+    public DtoPagoPreparado prepararPago(@RequestBody Map<String, Object> pagoData) {
         Long centimos = ((Number) pagoData.get("centimos")).longValue();
         return this.service.prepararPago(centimos);
     }

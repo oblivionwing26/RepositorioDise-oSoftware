@@ -1,7 +1,6 @@
 package edu.esi.ds.esientradas.http;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,16 +8,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
+import edu.esi.ds.esientradas.dto.DtoEntradaDisponible;
 import edu.esi.ds.esientradas.dto.DtoEntradas;
 import edu.esi.ds.esientradas.dto.DtoEspectaculo;
-import edu.esi.ds.esientradas.model.Entrada;
 import edu.esi.ds.esientradas.model.Escenario;
 import edu.esi.ds.esientradas.model.Espectaculo;
 import edu.esi.ds.esientradas.services.BusquedaService;
 
 @RestController
 @RequestMapping("/busqueda")
-@CrossOrigin(origins = "*")
 public class BusquedaController {
 
     @Autowired
@@ -49,7 +47,7 @@ public class BusquedaController {
         return dtoEspectaculos;
     }
 
-        @GetMapping("/getEspectaculos/{idEscenario}")
+    @GetMapping("/getEspectaculos/{idEscenario}")
     public List<DtoEspectaculo> getEspectaculosByEscenario(@PathVariable Long idEscenario) {
         List<Espectaculo> espectaculos = this.service.getEspectaculos(idEscenario);
 
@@ -70,9 +68,8 @@ public class BusquedaController {
     }
 
     @GetMapping("/getNumeroDeEntradasComoDto/{idEspectaculo}")
-    public DtoEntradas getNumeroDeEntradasComoDto(@RequestParam Long idEspectaculo) {
-        DtoEntradas dto = new DtoEntradas();
-            return dto;
+    public DtoEntradas getNumeroDeEntradasComoDto(@PathVariable Long idEspectaculo) {
+        return this.service.getNumeroDeEntradasComoDto(idEspectaculo);
     }
 
     @GetMapping("/getEntradasLibres/{idEspectaculo}")
@@ -80,6 +77,9 @@ public class BusquedaController {
         return this.service.getEntradasLibres(idEspectaculo);
     }
 
-    
+    @GetMapping("/getEntradasDisponibles/{idEspectaculo}")
+    public List<DtoEntradaDisponible> getEntradasDisponibles(@PathVariable Long idEspectaculo) {
+        return this.service.getEntradasDisponibles(idEspectaculo);
+    }
 
 }
