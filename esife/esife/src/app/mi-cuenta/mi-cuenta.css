@@ -1,0 +1,47 @@
+.cuenta-card {
+  max-width: 520px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.muted {
+  color: #666;
+}
+
+.cuenta-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: #f7f7f7;
+  border-radius: 8px;
+}
+
+.acciones {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+button.danger {
+  background: #b00020;
+  color: white;
+}
+
+.error {
+  color: #b00020;
+  margin-top: 1rem;
+}
+
+.ok {
+  color: #1b7f3a;
+  margin-top: 1rem;
+}
+
+.links {
+  margin-top: 1rem;
+}
