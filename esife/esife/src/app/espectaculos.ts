@@ -69,4 +69,13 @@ export class EspectaculosService {
   getEscenarios(): Observable<EscenarioDto[]> {
     return this.http.get<EscenarioDto[]>(`${this.BUSQUEDA_API}/getEscenarios`);
   }
+
+  buscarEspectaculos(artista: string): Observable<EspectaculoDto[]> {
+    return this.http.get<EspectaculoDto[]>(
+      `${this.BUSQUEDA_API}/getEspectaculos`,
+      {
+        params: { artista }
+      }
+    );
+  }
 }

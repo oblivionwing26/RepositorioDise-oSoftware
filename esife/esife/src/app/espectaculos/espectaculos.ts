@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
@@ -13,7 +14,7 @@ import {
 
 @Component({
   selector: 'espectaculos',
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './espectaculos.html',
   styleUrl: './espectaculos.css',
 })
@@ -22,6 +23,13 @@ export class Espectaculos implements OnInit {
   escenarios: EscenarioDto[] = [];
   error: string | null = null;
   loadingEscenarios = false;
+  busquedaArtista = '';
+  filtroEscenario = '';
+  filtroFecha = '';
+
+  resultadosBusqueda: EspectaculoDto[] = [];
+  busquedaRealizada = false;
+  loadingBusqueda = false;
 
   constructor(
     private espectaculosService: EspectaculosService,
@@ -115,6 +123,69 @@ export class Espectaculos implements OnInit {
     }
 
     return 'Entrada general';
+  }
+  
+
+  buscarEspectaculos(): void {
+    const artista = this.busquedaArtista.trim();
+
+    if (!artista) {
+      this.resultadosBusqueda = [];
+      this.busquedaRealizada = false;
+      return;
+    }
+
+    this.error = null;
+    this.loadingBusqueda = true;
+    this.busquedaRealizada = true;
+
+    this.espectaculosService.buscarEspectaculos(artista).subscribe({
+      next: espectaculos => {
+        this.resultadosBusqueda = espectaculos;
+        this.loadingBusqueda = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.error = 'No se pudieron buscar espectáculos.';
+        this.resultadosBusqueda = [];
+        this.loadingBusqueda = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  limpiarBusqueda(): void {
+    this.busquedaArtista = '';
+    this.filtroEscenario = '';
+    this.filtroFecha = '';
+    this.resultadosBusqueda = [];
+    this.busquedaRealizada = false;
+  }
+
+  get resultadosFiltrados(): EspectaculoDto[] {
+    return this.resultadosBusqueda.filter(espectaculo => {
+      const coincideEscenario =
+        !this.filtroEscenario ||
+        espectaculo.escenario === this.filtroEscenario;
+
+      const coincideFecha =
+        !this.filtroFecha ||
+        this.normalizarFecha(espectaculo.fecha) === this.filtroFecha;
+
+      return coincideEscenario && coincideFecha;
+    });
+  }
+
+  get escenariosDisponiblesFiltro(): string[] {
+    return [...new Set(this.resultadosBusqueda.map(e => e.escenario).filter(Boolean))];
+  }
+
+  private normalizarFecha(fecha: string | Date | undefined): string {
+    if (!fecha) {
+      return '';
+    }
+
+    return String(fecha).slice(0, 10);
   }
 
   private guardarCompraPendiente(espectaculo: EspectaculoDto, entrada: EntradaDisponible): void {
