@@ -5,3 +5,14 @@
 .auth-card button { padding: .6rem; cursor: pointer; }
 .auth-card .error { color: #c0392b; margin-top: .75rem; }
 .auth-card .links { margin-top: 1rem; font-size: .85rem; }
+
+.error {
+  color: #b00020;
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+input.ng-invalid.ng-touched,
+input.ng-invalid.ng-dirty {
+  border-color: #b00020;
+}
