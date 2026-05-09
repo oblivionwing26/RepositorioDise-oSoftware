@@ -47,12 +47,15 @@ export class Register {
         setTimeout(() => this.router.navigate(['/login']), 1200);
       },
       error: err => {
+        console.error('Registro fallido:', err);
         this.loading = false;
-        this.error = err.status === 409
-          ? 'El correo ya está registrado.'
-          : err.status === 400
-            ? 'Datos inválidos. Revisa email y contraseña.'
-            : 'Error al registrar la cuenta.';
+        this.error = err.status === 0
+          ? 'No se pudo conectar al servidor. Intenta más tarde.'
+           : err.status === 409
+            ? 'El correo ya está registrado.'
+            : err.status === 400
+              ? 'Datos inválidos. Revisa email y contraseña.'
+              : 'Error al registrar la cuenta.';
           this.cdr.detectChanges();
       }
     });
