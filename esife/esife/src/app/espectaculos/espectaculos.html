@@ -125,8 +125,9 @@
             <li *ngFor="let entrada of espectaculo.entradasDisponibles" class="entrada">
               <span>{{ etiquetaEntrada(entrada) }}</span>
               <span>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
-              <button type="button" (click)="seleccionarEntrada(espectaculo, entrada)">
-                Comprar
+
+              <button type="button" (click)="toggleEntrada(espectaculo, entrada)">
+                {{ estaSeleccionada(entrada) ? 'Quitar' : 'Seleccionar' }}
               </button>
             </li>
           </ul>
