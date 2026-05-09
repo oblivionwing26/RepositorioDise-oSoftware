@@ -1,89 +1,126 @@
 <section class="compra">
   <h1>Compra</h1>
 
-  <p *ngIf="!entrada" class="error">
+  <p *ngIf="!entradas.length" class="error">
     No hay ninguna entrada seleccionada.
     <a routerLink="/">Volver a espectáculos</a>
   </p>
 
-  <article *ngIf="entrada" class="compra__panel">
-    <h2>{{ espectaculo?.artista ?? 'Entrada seleccionada' }}</h2>
-    <p *ngIf="espectaculo" class="muted">{{ espectaculo.fecha }} · {{ espectaculo.escenario }}</p>
+  <article *ngIf="entradas.length" class="compra__panel">
+    <h2>{{ espectaculo?.artista ?? 'Entradas seleccionadas' }}</h2>
+
+    <p *ngIf="espectaculo" class="muted">
+      {{ espectaculo.fecha }} · {{ espectaculo.escenario }}
+    </p>
+
+    <section class="entradas-compra">
+      <h3>Entradas seleccionadas</h3>
+
+      <ul>
+        <li *ngFor="let entrada of entradas" class="entrada-compra">
+          <div>
+            <strong>{{ etiquetaEntrada(entrada) }}</strong>
+            <p class="muted">Entrada #{{ entrada.id }} · {{ entrada.tipo }}</p>
+          </div>
+
+          <span>
+            {{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}
+          </span>
+        </li>
+      </ul>
+    </section>
 
     <dl>
       <div>
-        <dt>Entrada</dt>
-        <dd>#{{ entrada.id }}</dd>
+        <dt>Número de entradas</dt>
+        <dd>{{ entradas.length }}</dd>
       </div>
+
       <div>
-        <dt>Tipo</dt>
-        <dd>{{ entrada.tipo }}</dd>
+        <dt>Total</dt>
+        <dd>{{ importe | currency:'EUR':'symbol':'1.2-2' }}</dd>
       </div>
-      <div *ngIf="entrada.zona != null">
-        <dt>Zona</dt>
-        <dd>{{ entrada.zona }}</dd>
-      </div>
-      <div *ngIf="entrada.planta != null">
-        <dt>Ubicación</dt>
-        <dd>Planta {{ entrada.planta }}, fila {{ entrada.fila }}, butaca {{ entrada.columna }}</dd>
-      </div>
-      <div>
-        <dt>Precio</dt>
-        <dd>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</dd>
-      </div>
+
       <div *ngIf="prerreserva">
         <dt>Prerreserva</dt>
         <dd>Hasta {{ prerreserva.expiraEn }}</dd>
       </div>
+
       <div *ngIf="compra">
         <dt>Estado</dt>
         <dd>{{ compra.estado }}</dd>
       </div>
+
       <div *ngIf="compra">
-        <dt>Código</dt>
+        <dt>Código(s)</dt>
         <dd>{{ compra.codigoEntrada }}</dd>
       </div>
+
       <div *ngIf="pagoPreparado">
         <dt>Pago</dt>
-        <dd>{{ compra?.estadoPago ?? pagoPreparado.estado }} · {{ compra?.metodoPago ?? pagoPreparado.metodo }}</dd>
+        <dd>
+          {{ compra?.estadoPago ?? pagoPreparado.estado }}
+          ·
+          {{ compra?.metodoPago ?? pagoPreparado.metodo }}
+        </dd>
       </div>
+
       <div *ngIf="compra">
         <dt>Email</dt>
         <dd>{{ compra.emailConfirmacionEnviado ? 'Enviado' : 'No enviado (SMTP)' }}</dd>
       </div>
     </dl>
 
-    <p *ngIf="loadingPrerreserva" class="muted">Creando prerreserva...</p>
+    <p *ngIf="loadingPrerreserva" class="muted">
+      Creando prerreserva...
+    </p>
 
     <p *ngIf="prerreserva && !compra" class="ok">
-      Entrada prerreservada. Puedes confirmar la compra antes de que expire.
+      Entradas prerreservadas. Puedes confirmar la compra antes de que expire.
     </p>
 
     <div *ngIf="esPagoStripe() && !compra" class="pago-stripe">
       <h3>Pago con Stripe</h3>
+
       <div id="stripe-card-element" class="stripe-card"></div>
-      <p class="muted">Tarjeta test: 4242 4242 4242 4242 · 12/34 · 123</p>
-      <button type="button" (click)="confirmarPagoStripe()" [disabled]="confirmandoStripe || !stripeCardComplete || pagoPreparado?.estado === 'CONFIRMADO'">
+
+      <p class="muted">
+        Tarjeta test: 4242 4242 4242 4242 · 12/34 · 123
+      </p>
+
+      <button
+        type="button"
+        (click)="confirmarPagoStripe()"
+        [disabled]="confirmandoStripe || !stripeCardComplete || pagoPreparado?.estado === 'CONFIRMADO'"
+      >
         {{ confirmandoStripe ? 'Confirmando...' : (pagoPreparado?.estado === 'CONFIRMADO' ? 'Pago confirmado' : 'Pagar con Stripe') }}
       </button>
+
       <p *ngIf="stripeMensaje" class="ok">{{ stripeMensaje }}</p>
       <p *ngIf="stripeError" class="error">{{ stripeError }}</p>
     </div>
 
     <div *ngIf="pagoPreparado?.metodo === 'SIMULADO' && !compra" class="pago-simulado">
-      Pago simulado preparado. Se confirmara al completar la compra.
+      Pago simulado preparado. Se confirmará al completar la compra.
     </div>
 
-    <button type="button" (click)="comprar()" [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !pagoPreparado || !pagoListoParaComprar() || !!compra">
-      {{ loading ? 'Comprando...' : 'Comprar entrada' }}
+    <button
+      type="button"
+      (click)="comprar()"
+      [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !pagoPreparado || !pagoListoParaComprar() || !!compra"
+    >
+      {{ loading ? 'Comprando...' : 'Comprar entradas' }}
     </button>
 
-    <button type="button" (click)="irAlPago()" [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !!pagoPreparado || !!compra">
+    <button
+      type="button"
+      (click)="irAlPago()"
+      [disabled]="loading || loadingPrerreserva || loadingPago || !prerreserva || !!pagoPreparado || !!compra"
+    >
       {{ loadingPago ? 'Preparando...' : 'Preparar pago' }}
     </button>
   </article>
 
   <p *ngIf="mensaje" class="ok">{{ mensaje }}</p>
   <p *ngIf="error" class="error">{{ error }}</p>
-
 </section>

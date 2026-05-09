@@ -62,6 +62,7 @@ export class Compra implements OnInit, OnDestroy {
   clientSecret = '';
   importe = 0;
   entrada?: EntradaDisponible;
+  entradas: EntradaDisponible[] = [];
   espectaculo?: EspectaculoDto;
   prerreserva?: PrerreservaResponse;
   pagoPreparado?: PagoPreparadoResponse;
@@ -89,6 +90,18 @@ export class Compra implements OnInit, OnDestroy {
     this.destruirFormularioStripe();
   }
 
+  etiquetaEntrada(entrada: EntradaDisponible): string {
+    if (entrada.tipo === 'ZONA') {
+      return `Zona ${entrada.zona ?? '-'}`;
+    }
+
+    if (entrada.tipo === 'PRECISA') {
+      return `Planta ${entrada.planta ?? '-'} · Fila ${entrada.fila ?? '-'} · Butaca ${entrada.columna ?? '-'}`;
+    }
+
+    return 'Entrada general';
+  }
+
   ngOnInit(): void {
     if (!this.auth.isLogged()) {
       this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
@@ -97,15 +110,20 @@ export class Compra implements OnInit, OnDestroy {
 
     const navigationState = history.state as {
       entrada?: EntradaDisponible;
+      entradas?: EntradaDisponible[];
       espectaculo?: EspectaculoDto;
       prerreserva?: PrerreservaResponse;
     };
 
-    this.entrada = navigationState.entrada;
+    this.entradas = navigationState.entradas ?? (
+      navigationState.entrada ? [navigationState.entrada] : []
+    );
+
+    this.entrada = this.entradas[0];
     this.espectaculo = navigationState.espectaculo;
     this.prerreserva = navigationState.prerreserva;
 
-    if (!this.entrada) {
+    if (!this.entradas.length) {
       this.cargarCompraPendiente();
     }
 
@@ -115,13 +133,17 @@ export class Compra implements OnInit, OnDestroy {
 
     if (this.prerreserva?.precio != null) {
       this.importe = this.prerreserva.precio / 100;
-    } else if (this.entrada?.precio != null) {
-      this.importe = this.entrada.precio / 100;
+    } else {
+      this.importe = this.totalEntradasCentimos() / 100;
     }
 
     if (this.entrada && !this.prerreserva) {
       this.crearPrerreserva();
     }
+  }
+
+  totalEntradasCentimos(): number {
+    return this.entradas.reduce((total, entrada) => total + entrada.precio, 0);
   }
 
   crearPrerreserva(): void {
@@ -194,9 +216,9 @@ export class Compra implements OnInit, OnDestroy {
           this.pagoPreparado.estado = compra.estadoPago;
           this.pagoPreparado.metodo = compra.metodoPago;
         }
-        if (this.entrada) {
-          this.entrada.estado = compra.estado;
-        }
+        this.entradas.forEach(entrada => {
+          entrada.estado = compra.estado;
+        });
         this.limpiarCompraPendiente();
         this.destruirFormularioStripe();
         this.loading = false;
@@ -228,12 +250,17 @@ export class Compra implements OnInit, OnDestroy {
     try {
       const compraPendiente = JSON.parse(raw) as {
         entrada?: EntradaDisponible;
+        entradas?: EntradaDisponible[];
         espectaculo?: EspectaculoDto;
         prerreserva?: PrerreservaResponse;
         pagoPreparado?: PagoPreparadoResponse;
       };
-      this.entrada = compraPendiente.entrada;
-      this.espectaculo = compraPendiente.espectaculo;
+      this.entradas = compraPendiente.entradas ?? (
+          compraPendiente.entrada ? [compraPendiente.entrada] : []
+        );
+
+        this.entrada = this.entradas[0];
+        this.espectaculo = compraPendiente.espectaculo;
       if (compraPendiente.prerreserva && this.prerreservaActiva(compraPendiente.prerreserva)) {
         this.prerreserva = compraPendiente.prerreserva;
         this.pagoPreparado = compraPendiente.pagoPreparado;
@@ -248,20 +275,21 @@ export class Compra implements OnInit, OnDestroy {
   }
 
   private guardarCompraPendiente(): void {
-    if (typeof sessionStorage === 'undefined' || !this.entrada) {
-      return;
-    }
-
-    sessionStorage.setItem(
-      this.COMPRA_STORAGE_KEY,
-      JSON.stringify({
-        entrada: this.entrada,
-        espectaculo: this.espectaculo,
-        prerreserva: this.prerreserva,
-        pagoPreparado: this.pagoPreparado,
-      }),
-    );
+  if (typeof sessionStorage === 'undefined' || !this.entradas.length) {
+    return;
   }
+
+  sessionStorage.setItem(
+    this.COMPRA_STORAGE_KEY,
+    JSON.stringify({
+      entrada: this.entradas[0],
+      entradas: this.entradas,
+      espectaculo: this.espectaculo,
+      prerreserva: this.prerreserva,
+      pagoPreparado: this.pagoPreparado,
+    }),
+  );
+}
 
   private limpiarCompraPendiente(): void {
     if (typeof sessionStorage !== 'undefined') {
