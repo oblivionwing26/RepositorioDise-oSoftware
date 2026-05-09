@@ -1,7 +1,0 @@
-.auth-card { max-width: 360px; margin: 2rem auto; padding: 1.5rem; border: 1px solid #ddd; border-radius: 8px; }
-.auth-card form { display: flex; flex-direction: column; gap: .75rem; }
-.auth-card label { display: flex; flex-direction: column; font-size: .9rem; }
-.auth-card input { padding: .5rem; }
-.auth-card button { padding: .6rem; cursor: pointer; }
-.auth-card .error { color: #c0392b; margin-top: .75rem; }
-.auth-card .links { margin-top: 1rem; font-size: .85rem; }
