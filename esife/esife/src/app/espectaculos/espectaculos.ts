@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
+import { PrerreservaResponse, ReservasService } from '../services/reservas';
 
 import { Auth } from '../services/auth';
 import {
@@ -24,6 +25,9 @@ interface ItemCarrito {
   styleUrl: './espectaculos.css',
 })
 export class Espectaculos implements OnInit {
+  prerreserva: PrerreservaResponse | null = null;
+  tokenPrerreserva: string | null = null;
+  reservaHasta: string | null = null;
   carrito: ItemCarrito[] = [];
   mensajeCarrito: string | null = null;
 
@@ -41,9 +45,10 @@ export class Espectaculos implements OnInit {
 
   constructor(
     private espectaculosService: EspectaculosService,
+    private reservasService: ReservasService,
     private auth: Auth,
     private router: Router,
-    private cdr: ChangeDetectorRef,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -58,9 +63,15 @@ export class Espectaculos implements OnInit {
   toggleEntrada(espectaculo: EspectaculoDto, entrada: EntradaDisponible): void {
     this.mensajeCarrito = null;
 
+    const tokenUsuario = this.auth.getToken();
+
+    if (!tokenUsuario) {
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/espectaculos' } });
+      return;
+    }
+
     if (this.estaSeleccionada(entrada)) {
-      this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
-      this.guardarCarrito();
+      this.quitarDelCarrito(entrada);
       return;
     }
 
@@ -69,27 +80,72 @@ export class Espectaculos implements OnInit {
       return;
     }
 
-    const espectaculoSeleccionado: EspectaculoDto = {
-      id: espectaculo.id,
-      artista: espectaculo.artista,
-      fecha: espectaculo.fecha,
-      escenario: espectaculo.escenario,
-    };
+    this.reservasService.prerreservar(entrada.id, tokenUsuario, this.tokenPrerreserva).subscribe({
+      next: prerreserva => {
+        this.prerreserva = prerreserva;
+        this.tokenPrerreserva = prerreserva.tokenEntrada;
+        this.reservaHasta = prerreserva.expiraEn;
 
-    this.carrito = [
-      ...this.carrito,
-      {
-        espectaculo: espectaculoSeleccionado,
-        entrada,
+        const espectaculoSeleccionado: EspectaculoDto = {
+          id: espectaculo.id,
+          artista: espectaculo.artista,
+          fecha: espectaculo.fecha,
+          escenario: espectaculo.escenario,
+        };
+
+        entrada.estado = 'PRERRESERVADA';
+
+        this.carrito = [
+          ...this.carrito,
+          {
+            espectaculo: espectaculoSeleccionado,
+            entrada,
+          },
+        ];
+
+        this.guardarCarrito();
+        this.cdr.detectChanges();
       },
-    ];
-
-    this.guardarCarrito();
+      error: err => {
+        console.error('Error al prerreservar entrada:', err);
+        this.mensajeCarrito = err.error?.message ?? 'La entrada ya no está disponible.';
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   quitarDelCarrito(entrada: EntradaDisponible): void {
-    this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
-    this.guardarCarrito();
+    const tokenUsuario = this.auth.getToken();
+
+    if (!tokenUsuario || !this.tokenPrerreserva) {
+      this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
+      this.guardarCarrito();
+      return;
+    }
+
+    this.reservasService
+      .liberarEntradaPrerreservada(entrada.id, tokenUsuario, this.tokenPrerreserva)
+      .subscribe({
+        next: () => {
+          entrada.estado = 'DISPONIBLE';
+
+          this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
+
+          if (!this.carrito.length) {
+            this.prerreserva = null;
+            this.tokenPrerreserva = null;
+            this.reservaHasta = null;
+          }
+
+          this.guardarCarrito();
+          this.cdr.detectChanges();
+        },
+        error: err => {
+          console.error('Error al liberar entrada:', err);
+          this.mensajeCarrito = 'No se pudo liberar la entrada.';
+          this.cdr.detectChanges();
+        },
+      });
   }
 
   vaciarCarrito(): void {
@@ -111,6 +167,11 @@ export class Espectaculos implements OnInit {
       return;
     }
 
+    if (!this.prerreserva) {
+      this.mensajeCarrito = 'No hay una prerreserva activa.';
+      return;
+    }
+
     this.guardarCarrito();
 
     if (!this.auth.isLogged()) {
@@ -124,9 +185,10 @@ export class Espectaculos implements OnInit {
     this.router.navigate(['/comprar'], {
       state: {
         espectaculo,
-        entrada: entradas[0],     // compatibilidad con la compra antigua
-        entradas,                 // nueva compra múltiple
+        entrada: entradas[0],
+        entradas,
         items: this.carrito,
+        prerreserva: this.prerreserva,
         total: this.totalCarritoCentimos(),
       },
     });
@@ -149,9 +211,12 @@ export class Espectaculos implements OnInit {
       this.COMPRA_STORAGE_KEY,
       JSON.stringify({
         espectaculo,
-        entrada: entradas[0],   // compatibilidad con código anterior
+        entrada: entradas[0],
         entradas,
         items: this.carrito,
+        prerreserva: this.prerreserva,
+        tokenPrerreserva: this.tokenPrerreserva,
+        reservaHasta: this.reservaHasta,
         total: this.totalCarritoCentimos(),
       }),
     );
@@ -171,11 +236,37 @@ export class Espectaculos implements OnInit {
     try {
       const data = JSON.parse(raw);
 
+      // Restaurar prerreserva
+      this.prerreserva = data.prerreserva ?? null;
+      this.tokenPrerreserva = data.tokenPrerreserva ?? data.prerreserva?.tokenEntrada ?? null;
+      this.reservaHasta = data.reservaHasta ?? data.prerreserva?.expiraEn ?? null;
+
+      // Si la prerreserva ha caducado, limpiamos el carrito local
+      if (this.reservaHasta && new Date(this.reservaHasta).getTime() <= Date.now()) {
+        this.carrito = [];
+        this.prerreserva = null;
+        this.tokenPrerreserva = null;
+        this.reservaHasta = null;
+        sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+        return;
+      }
+
+      // Caso nuevo: carrito con varios items
       if (Array.isArray(data.items)) {
         this.carrito = data.items;
         return;
       }
 
+      // Caso alternativo: viene espectaculo + array de entradas
+      if (data.espectaculo && Array.isArray(data.entradas)) {
+        this.carrito = data.entradas.map((entrada: EntradaDisponible) => ({
+          espectaculo: data.espectaculo,
+          entrada,
+        }));
+        return;
+      }
+
+      // Caso antiguo: solo una entrada
       if (data.espectaculo && data.entrada) {
         this.carrito = [
           {
@@ -183,7 +274,11 @@ export class Espectaculos implements OnInit {
             entrada: data.entrada,
           },
         ];
+        return;
       }
+
+      // Si el formato no encaja, limpiamos
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
     } catch {
       sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
     }

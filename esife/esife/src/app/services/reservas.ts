@@ -6,7 +6,7 @@ export interface PrerreservaResponse {
   idEntrada: number;
   tokenEntrada: string;
   expiraEn: string;
-  precio: number;
+  precio: number; // idealmente precio total de la prerreserva
 }
 
 @Injectable({ providedIn: 'root' })
@@ -15,11 +15,38 @@ export class ReservasService {
 
   constructor(private http: HttpClient) {}
 
-  prerreservar(idEntrada: number, tokenUsuario: string): Observable<PrerreservaResponse> {
-    const params = new HttpParams()
+  prerreservar(
+    idEntrada: number,
+    tokenUsuario: string,
+    tokenPrerreserva?: string | null
+  ): Observable<PrerreservaResponse> {
+    let params = new HttpParams()
       .set('idEntrada', idEntrada)
       .set('tokenUsuario', tokenUsuario);
 
-    return this.http.put<PrerreservaResponse>(`${this.RESERVAS_API}/prerreservar`, null, { params });
+    if (tokenPrerreserva) {
+      params = params.set('tokenPrerreserva', tokenPrerreserva);
+    }
+
+    return this.http.put<PrerreservaResponse>(
+      `${this.RESERVAS_API}/prerreservar`,
+      null,
+      { params }
+    );
+  }
+
+  liberarEntradaPrerreservada(
+    idEntrada: number,
+    tokenUsuario: string,
+    tokenPrerreserva: string
+  ): Observable<void> {
+    const params = new HttpParams()
+      .set('tokenUsuario', tokenUsuario)
+      .set('tokenPrerreserva', tokenPrerreserva);
+
+    return this.http.delete<void>(
+      `${this.RESERVAS_API}/prerreservar/${idEntrada}`,
+      { params }
+    );
   }
 }

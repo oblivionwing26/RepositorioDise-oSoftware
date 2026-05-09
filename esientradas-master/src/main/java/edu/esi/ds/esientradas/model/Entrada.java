@@ -23,7 +23,7 @@ public abstract class Entrada {
     @Id @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     protected Long id;
     private Long precio;     // Ojo: en céntimos de euro
-    @Column(unique = true)
+    @Column
     private String tokenPrerreserva;
     private LocalDateTime prerreservaExpiraEn;
     private String usuarioPrerreserva;

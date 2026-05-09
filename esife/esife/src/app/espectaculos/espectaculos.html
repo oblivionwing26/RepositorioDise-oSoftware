@@ -41,11 +41,14 @@
   </form>
 
   <p *ngIf="error" class="error">{{ error }}</p>
-  
+
   <p *ngIf="mensajeCarrito" class="error">{{ mensajeCarrito }}</p>
 
   <section *ngIf="carrito.length" class="carrito">
     <h2>Entradas seleccionadas</h2>
+    <p *ngIf="reservaHasta" class="muted">
+      Las entradas están prerreservadas hasta: {{ reservaHasta | date:'short' }}
+    </p>
 
     <ul>
       <li *ngFor="let item of carrito">
