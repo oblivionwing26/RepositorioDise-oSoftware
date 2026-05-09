@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { PagoPreparadoResponse, Pagos } from '../pagos';
 import { Auth } from '../services/auth';
+import { ColaService, TurnoColaResponse } from '../services/cola';
 import { CompraResponse, ComprasService } from '../services/compras';
 import { PrerreservaResponse, ReservasService } from '../services/reservas';
 import { EntradaDisponible, EspectaculoDto } from '../espectaculos';
@@ -56,6 +57,7 @@ declare global {
 })
 export class Compra implements OnInit, OnDestroy {
   private readonly COMPRA_STORAGE_KEY = 'compraPendiente';
+  private colaPollingId?: ReturnType<typeof setInterval>;
   private stripe?: StripeInstance;
   private stripeCard?: StripeCardElement;
   private stripeScriptPromise?: Promise<void>;
@@ -65,11 +67,13 @@ export class Compra implements OnInit, OnDestroy {
   entradas: EntradaDisponible[] = [];
   espectaculo?: EspectaculoDto;
   prerreserva?: PrerreservaResponse;
+  turnoCola?: TurnoColaResponse;
   pagoPreparado?: PagoPreparadoResponse;
   compra?: CompraResponse;
   mensaje: string | null = null;
   error: string | null = null;
   loading = false;
+  loadingCola = false;
   loadingPrerreserva = false;
   loadingPago = false;
   confirmandoStripe = false;
@@ -81,12 +85,14 @@ export class Compra implements OnInit, OnDestroy {
     private pagosService: Pagos,
     private comprasService: ComprasService,
     private reservasService: ReservasService,
+    private colaService: ColaService,
     private auth: Auth,
     private router: Router,
     private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnDestroy(): void {
+    this.detenerPollingCola();
     this.destruirFormularioStripe();
   }
 
@@ -138,8 +144,47 @@ export class Compra implements OnInit, OnDestroy {
     }
 
     if (this.entrada && !this.prerreserva) {
-      this.crearPrerreserva();
+      this.entrarEnColaOPrerreservar();
     }
+  }
+
+  entrarEnColaOPrerreservar(): void {
+    if (this.turnoCola?.puedePrerreservar || this.turnoCola?.colaActiva === false) {
+      this.crearPrerreserva();
+      return;
+    }
+
+    this.entrarEnCola();
+  }
+
+  entrarEnCola(): void {
+    this.error = null;
+
+    const tokenUsuario = this.auth.getToken();
+    if (!tokenUsuario) {
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
+      return;
+    }
+
+    if (!this.espectaculo?.id) {
+      this.error = 'No se pudo identificar el espectáculo para entrar en cola.';
+      return;
+    }
+
+    this.loadingCola = true;
+    this.colaService.entrar(this.espectaculo.id, tokenUsuario).subscribe({
+      next: turno => this.procesarTurnoCola(turno),
+      error: err => {
+        this.loadingCola = false;
+        if (err.status === 401) {
+          this.auth.logout();
+          this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
+          return;
+        }
+        this.error = this.mensajeError(err, 'No se pudo entrar en la cola virtual.');
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   totalEntradasCentimos(): number {
@@ -160,12 +205,19 @@ export class Compra implements OnInit, OnDestroy {
       return;
     }
 
+    const idTurno = this.turnoCola?.idTurno;
+    if (this.turnoCola?.colaActiva !== false && !idTurno) {
+      this.error = 'Antes de prerreservar tienes que entrar en la cola virtual.';
+      return;
+    }
+
     this.loadingPrerreserva = true;
-    this.reservasService.prerreservar(this.entrada.id, tokenUsuario).subscribe({
+    this.reservasService.prerreservar(this.entrada.id, tokenUsuario, idTurno).subscribe({
       next: prerreserva => {
         this.prerreserva = prerreserva;
         this.importe = prerreserva.precio / 100;
         this.loadingPrerreserva = false;
+        this.detenerPollingCola();
         this.guardarCompraPendiente();
         this.cdr.detectChanges();
       },
@@ -252,6 +304,7 @@ export class Compra implements OnInit, OnDestroy {
         entrada?: EntradaDisponible;
         entradas?: EntradaDisponible[];
         espectaculo?: EspectaculoDto;
+        turnoCola?: TurnoColaResponse;
         prerreserva?: PrerreservaResponse;
         pagoPreparado?: PagoPreparadoResponse;
       };
@@ -299,6 +352,63 @@ export class Compra implements OnInit, OnDestroy {
 
   private prerreservaActiva(prerreserva: PrerreservaResponse): boolean {
     return new Date(prerreserva.expiraEn).getTime() > Date.now();
+  }
+
+  private procesarTurnoCola(turno: TurnoColaResponse): void {
+    this.turnoCola = turno;
+    this.loadingCola = false;
+    this.guardarCompraPendiente();
+
+    if (!turno.colaActiva || turno.puedePrerreservar) {
+      this.detenerPollingCola();
+      this.crearPrerreserva();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (turno.estado === 'ESPERANDO') {
+      this.iniciarPollingCola();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.detenerPollingCola();
+    this.error = turno.mensaje || 'El turno de cola no esta disponible. Entra de nuevo en la cola.';
+    this.cdr.detectChanges();
+  }
+
+  private iniciarPollingCola(): void {
+    if (this.colaPollingId || typeof window === 'undefined') {
+      return;
+    }
+
+    this.colaPollingId = setInterval(() => this.consultarEstadoCola(), 5000);
+  }
+
+  private consultarEstadoCola(): void {
+    const tokenUsuario = this.auth.getToken();
+    const idTurno = this.turnoCola?.idTurno;
+    if (!tokenUsuario || !idTurno) {
+      this.detenerPollingCola();
+      return;
+    }
+
+    this.colaService.estado(idTurno, tokenUsuario).subscribe({
+      next: turno => this.procesarTurnoCola(turno),
+      error: err => {
+        this.detenerPollingCola();
+        this.error = this.mensajeError(err, 'No se pudo consultar el estado de la cola.');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  private detenerPollingCola(): void {
+    if (!this.colaPollingId) {
+      return;
+    }
+    clearInterval(this.colaPollingId);
+    this.colaPollingId = undefined;
   }
 
   private mensajeError(err: any, fallback: string): string {

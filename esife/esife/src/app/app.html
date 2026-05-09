@@ -13,4 +13,19 @@
   </ng-template>
 </nav>
 
-<router-outlet />
+    <div class="topbar__links">
+      <a routerLink="/">Cartelera</a>
+      <ng-container *ngIf="!isLogged(); else logged">
+        <a routerLink="/login">Login</a>
+        <a routerLink="/register" class="topbar__cta">Registro</a>
+      </ng-container>
+      <ng-template #logged>
+        <button type="button" class="topbar__logout" (click)="logout()">Cerrar sesión</button>
+      </ng-template>
+    </div>
+  </nav>
+
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>

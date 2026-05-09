@@ -45,7 +45,10 @@
         <dt>Prerreserva</dt>
         <dd>Hasta {{ prerreserva.expiraEn }}</dd>
       </div>
-
+      <div *ngIf="turnoCola && !prerreserva">
+        <dt>Cola</dt>
+        <dd>{{ turnoCola.estado }}<span *ngIf="turnoCola.estado === 'ESPERANDO'"> · posición {{ turnoCola.posicion }}</span></dd>
+      </div>
       <div *ngIf="compra">
         <dt>Estado</dt>
         <dd>{{ compra.estado }}</dd>
@@ -74,6 +77,18 @@
     <p *ngIf="loadingPrerreserva" class="muted">
       Creando prerreserva...
     </p>
+    <section *ngIf="turnoCola && !prerreserva && !compra" class="cola-virtual">
+      <h3>Cola virtual</h3>
+      <p>{{ turnoCola.mensaje }}</p>
+      <p *ngIf="turnoCola.estado === 'ESPERANDO'" class="muted">Posición actual: {{ turnoCola.posicion }}. La página se actualizará automáticamente.</p>
+      <p *ngIf="turnoCola.estado === 'ACTIVO' && turnoCola.activoHasta" class="ok">Turno activo hasta {{ turnoCola.activoHasta }}.</p>
+      <button *ngIf="turnoCola.estado === 'EXPIRADO' || turnoCola.estado === 'FINALIZADO'" type="button" (click)="entrarEnCola()" [disabled]="loadingCola">
+        Entrar de nuevo
+      </button>
+    </section>
+
+    <p *ngIf="loadingCola" class="muted">Entrando en la cola virtual...</p>
+    <p *ngIf="loadingPrerreserva" class="muted">Creando prerreserva...</p>
 
     <p *ngIf="prerreserva && !compra" class="ok">
       Entradas prerreservadas. Puedes confirmar la compra antes de que expire.

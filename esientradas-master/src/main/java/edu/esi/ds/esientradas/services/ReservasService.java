@@ -28,6 +28,9 @@ public class ReservasService {
     @Autowired
     private TokenDao tokenDao;
 
+    @Autowired
+    private ColaService colaService;
+
     @Value("${app.prerreserva.expiration-minutes:10}")
     private long prerreservaExpirationMinutes;
 
@@ -64,6 +67,8 @@ public class ReservasService {
 
         Entrada entrada = this.entradaDao.findByIdForUpdate(idEntrada)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entrada no encontrada"));
+
+        this.colaService.validarTurnoActivo(entrada.getEspectaculo().getId(), email, idTurno);
 
         LocalDateTime now = LocalDateTime.now();
 

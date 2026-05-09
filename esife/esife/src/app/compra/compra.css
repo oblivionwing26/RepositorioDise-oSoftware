@@ -1,7 +1,16 @@
 .compra {
-  max-width: 720px;
-  margin: 24px auto;
-  padding: 0 16px;
+  display: grid;
+  gap: 18px;
+  max-width: 860px;
+  margin: 0 auto;
+  animation: rise-in 460ms ease both;
+}
+
+.compra h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.7rem);
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .entradas-compra ul {
@@ -30,55 +39,82 @@
 }
 
 .compra__panel {
-  border: 1px solid #d7dce2;
-  border-radius: 6px;
-  padding: 16px;
-  background: #fff;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.065));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.compra__panel::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(120deg, rgba(255, 209, 102, 0.13), transparent 34%, rgba(151, 92, 255, 0.13));
+}
+
+.compra__panel > * {
+  position: relative;
+}
+
+.compra__panel h2 {
+  margin: 0 0 6px;
+  color: var(--soft);
+  font-size: clamp(1.4rem, 4vw, 2.3rem);
+  letter-spacing: 0;
 }
 
 dl {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
-  margin: 16px 0;
+  margin: 20px 0;
+}
+
+dl div {
+  min-height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.075);
 }
 
 dt {
-  color: #667085;
+  color: var(--muted);
   font-size: 0.85rem;
+  font-weight: 800;
 }
 
 dd {
   margin: 4px 0 0;
+  color: var(--soft);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 button {
-  margin-right: 8px;
+  margin: 0 8px 8px 0;
   cursor: pointer;
 }
 
-.ok {
-  color: #027a48;
-}
-
-.error {
-  color: #b42318;
-}
-
-.muted {
-  color: #667085;
-}
-
 .pago-stripe,
-.pago-simulado {
+.pago-simulado,
+.cola-virtual {
   margin-top: 16px;
   margin-bottom: 12px;
-  padding: 12px;
-  border: 1px solid #d7dce2;
-  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius);
+  color: var(--soft);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
 }
 
+.cola-virtual h3,
 .pago-stripe h3 {
   margin: 0 0 12px;
   font-size: 1rem;
@@ -86,12 +122,33 @@ button {
 
 .stripe-card {
   padding: 12px;
-  border: 1px solid #cfd6df;
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+.cola-virtual {
+  animation: pulse-panel 2200ms ease-in-out infinite;
+}
+
+@keyframes pulse-panel {
+  0%,
+  100% {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 18px 44px rgba(255, 209, 102, 0.16);
+  }
+}
+
+@media (max-width: 640px) {
+  .compra__panel {
+    padding: 18px;
+  }
+
+  button {
+    width: 100%;
+    margin-right: 0;
+  }
 }
