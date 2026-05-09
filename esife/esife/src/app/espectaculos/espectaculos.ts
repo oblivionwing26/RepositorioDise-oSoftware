@@ -124,7 +124,15 @@ export class Espectaculos implements OnInit {
 
     return 'Entrada general';
   }
-  
+  get escenariosFiltrados(): EscenarioDto[] {
+    if (!this.filtroEscenario) {
+      return this.escenarios;
+    }
+
+    return this.escenarios.filter(escenario =>
+      escenario.nombre === this.filtroEscenario
+    );
+  }
 
   buscarEspectaculos(): void {
     const artista = this.busquedaArtista.trim();
@@ -177,7 +185,7 @@ export class Espectaculos implements OnInit {
   }
 
   get escenariosDisponiblesFiltro(): string[] {
-    return [...new Set(this.resultadosBusqueda.map(e => e.escenario).filter(Boolean))];
+    return this.escenarios.map(escenario => escenario.nombre);
   }
 
   private normalizarFecha(fecha: string | Date | undefined): string {

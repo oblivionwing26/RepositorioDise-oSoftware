@@ -17,7 +17,6 @@
     <select
       name="filtroEscenario"
       [(ngModel)]="filtroEscenario"
-      [disabled]="!resultadosBusqueda.length"
     >
       <option value="">Todos los escenarios</option>
       <option *ngFor="let escenario of escenariosDisponiblesFiltro" [value]="escenario">
@@ -94,7 +93,7 @@
   </section>
 
   <ol *ngIf="!busquedaRealizada" class="escenarios">
-    <li *ngFor="let escenario of escenarios" class="escenario">
+    <li *ngFor="let escenario of escenariosFiltrados" class="escenario">
       <button type="button" class="escenario__button" (click)="getEspectaculos(escenario)">
         <strong>{{ escenario.nombre }}</strong>
         <span>{{ escenario.descripcion }}</span>
