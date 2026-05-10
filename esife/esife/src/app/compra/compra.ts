@@ -61,9 +61,11 @@ export class Compra implements OnInit, OnDestroy {
   private stripe?: StripeInstance;
   private stripeCard?: StripeCardElement;
   private stripeScriptPromise?: Promise<void>;
+
   clientSecret = '';
   importe = 0;
   entrada?: EntradaDisponible;
+  entradas: EntradaDisponible[] = [];
   espectaculo?: EspectaculoDto;
   prerreserva?: PrerreservaResponse;
   turnoCola?: TurnoColaResponse;
@@ -103,31 +105,52 @@ export class Compra implements OnInit, OnDestroy {
 
     const navigationState = history.state as {
       entrada?: EntradaDisponible;
+      entradas?: EntradaDisponible[];
       espectaculo?: EspectaculoDto;
       prerreserva?: PrerreservaResponse;
     };
 
-    this.entrada = navigationState.entrada;
+    this.entradas = navigationState.entradas ?? (
+      navigationState.entrada ? [navigationState.entrada] : []
+    );
+    this.entrada = this.entradas[0];
     this.espectaculo = navigationState.espectaculo;
     this.prerreserva = navigationState.prerreserva;
 
-    if (!this.entrada) {
+    if (!this.entradas.length) {
       this.cargarCompraPendiente();
     }
 
     if (this.prerreserva && !this.prerreservaActiva(this.prerreserva)) {
       this.prerreserva = undefined;
+      this.pagoPreparado = undefined;
     }
 
     if (this.prerreserva?.precio != null) {
       this.importe = this.prerreserva.precio / 100;
-    } else if (this.entrada?.precio != null) {
-      this.importe = this.entrada.precio / 100;
+    } else {
+      this.importe = this.totalEntradasCentimos() / 100;
     }
 
-    if (this.entrada && !this.prerreserva) {
+    if (this.entradas.length && !this.prerreserva) {
       this.entrarEnColaOPrerreservar();
     }
+  }
+
+  etiquetaEntrada(entrada: EntradaDisponible): string {
+    if (entrada.tipo === 'ZONA') {
+      return `Zona ${entrada.zona ?? '-'}`;
+    }
+
+    if (entrada.tipo === 'PRECISA') {
+      return `Planta ${entrada.planta ?? '-'} · Fila ${entrada.fila ?? '-'} · Butaca ${entrada.columna ?? '-'}`;
+    }
+
+    return 'Entrada general';
+  }
+
+  totalEntradasCentimos(): number {
+    return this.entradas.reduce((total, entrada) => total + entrada.precio, 0);
   }
 
   entrarEnColaOPrerreservar(): void {
@@ -178,8 +201,8 @@ export class Compra implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.entrada) {
-      this.error = 'Selecciona una entrada libre antes de prerreservar.';
+    if (!this.entradas.length) {
+      this.error = 'Selecciona al menos una entrada libre antes de prerreservar.';
       return;
     }
 
@@ -190,26 +213,7 @@ export class Compra implements OnInit, OnDestroy {
     }
 
     this.loadingPrerreserva = true;
-    this.reservasService.prerreservar(this.entrada.id, tokenUsuario, idTurno).subscribe({
-      next: prerreserva => {
-        this.prerreserva = prerreserva;
-        this.importe = prerreserva.precio / 100;
-        this.loadingPrerreserva = false;
-        this.detenerPollingCola();
-        this.guardarCompraPendiente();
-        this.cdr.detectChanges();
-      },
-      error: err => {
-        this.loadingPrerreserva = false;
-        if (err.status === 401) {
-          this.auth.logout();
-          this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-          return;
-        }
-        this.error = this.mensajeError(err, 'No se pudo prerreservar la entrada.');
-        this.cdr.detectChanges();
-      },
-    });
+    this.prerreservarEntradaSecuencial(0, tokenUsuario, idTurno, this.prerreserva?.tokenEntrada ?? null);
   }
 
   comprar(): void {
@@ -246,9 +250,9 @@ export class Compra implements OnInit, OnDestroy {
           this.pagoPreparado.estado = compra.estadoPago;
           this.pagoPreparado.metodo = compra.metodoPago;
         }
-        if (this.entrada) {
-          this.entrada.estado = compra.estado;
-        }
+        this.entradas.forEach(entrada => {
+          entrada.estado = compra.estado;
+        });
         this.limpiarCompraPendiente();
         this.destruirFormularioStripe();
         this.loading = false;
@@ -265,131 +269,6 @@ export class Compra implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
     });
-  }
-
-  private cargarCompraPendiente(): void {
-    if (typeof sessionStorage === 'undefined') {
-      return;
-    }
-
-    const raw = sessionStorage.getItem(this.COMPRA_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const compraPendiente = JSON.parse(raw) as {
-        entrada?: EntradaDisponible;
-        espectaculo?: EspectaculoDto;
-        turnoCola?: TurnoColaResponse;
-        prerreserva?: PrerreservaResponse;
-        pagoPreparado?: PagoPreparadoResponse;
-      };
-      this.entrada = compraPendiente.entrada;
-      this.espectaculo = compraPendiente.espectaculo;
-      this.turnoCola = compraPendiente.turnoCola;
-      if (compraPendiente.prerreserva && this.prerreservaActiva(compraPendiente.prerreserva)) {
-        this.prerreserva = compraPendiente.prerreserva;
-        this.pagoPreparado = compraPendiente.pagoPreparado;
-        this.clientSecret = compraPendiente.pagoPreparado?.clientSecret ?? '';
-        if (this.esPagoStripePendiente()) {
-          setTimeout(() => this.montarFormularioStripe(), 0);
-        }
-      }
-    } catch {
-      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
-    }
-  }
-
-  private guardarCompraPendiente(): void {
-    if (typeof sessionStorage === 'undefined' || !this.entrada) {
-      return;
-    }
-
-    sessionStorage.setItem(
-      this.COMPRA_STORAGE_KEY,
-      JSON.stringify({
-        entrada: this.entrada,
-        espectaculo: this.espectaculo,
-        turnoCola: this.turnoCola,
-        prerreserva: this.prerreserva,
-        pagoPreparado: this.pagoPreparado,
-      }),
-    );
-  }
-
-  private limpiarCompraPendiente(): void {
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
-    }
-  }
-
-  private prerreservaActiva(prerreserva: PrerreservaResponse): boolean {
-    return new Date(prerreserva.expiraEn).getTime() > Date.now();
-  }
-
-  private procesarTurnoCola(turno: TurnoColaResponse): void {
-    this.turnoCola = turno;
-    this.loadingCola = false;
-    this.guardarCompraPendiente();
-
-    if (!turno.colaActiva || turno.puedePrerreservar) {
-      this.detenerPollingCola();
-      this.crearPrerreserva();
-      this.cdr.detectChanges();
-      return;
-    }
-
-    if (turno.estado === 'ESPERANDO') {
-      this.iniciarPollingCola();
-      this.cdr.detectChanges();
-      return;
-    }
-
-    this.detenerPollingCola();
-    this.error = turno.mensaje || 'El turno de cola no esta disponible. Entra de nuevo en la cola.';
-    this.cdr.detectChanges();
-  }
-
-  private iniciarPollingCola(): void {
-    if (this.colaPollingId || typeof window === 'undefined') {
-      return;
-    }
-
-    this.colaPollingId = setInterval(() => this.consultarEstadoCola(), 5000);
-  }
-
-  private consultarEstadoCola(): void {
-    const tokenUsuario = this.auth.getToken();
-    const idTurno = this.turnoCola?.idTurno;
-    if (!tokenUsuario || !idTurno) {
-      this.detenerPollingCola();
-      return;
-    }
-
-    this.colaService.estado(idTurno, tokenUsuario).subscribe({
-      next: turno => this.procesarTurnoCola(turno),
-      error: err => {
-        this.detenerPollingCola();
-        this.error = this.mensajeError(err, 'No se pudo consultar el estado de la cola.');
-        this.cdr.detectChanges();
-      },
-    });
-  }
-
-  private detenerPollingCola(): void {
-    if (!this.colaPollingId) {
-      return;
-    }
-    clearInterval(this.colaPollingId);
-    this.colaPollingId = undefined;
-  }
-
-  private mensajeError(err: any, fallback: string): string {
-    if (typeof err.error === 'string') {
-      return err.error;
-    }
-    return err.error?.message ?? fallback;
   }
 
   irAlPago(): void {
@@ -475,6 +354,199 @@ export class Compra implements OnInit, OnDestroy {
       this.confirmandoStripe = false;
       this.cdr.detectChanges();
     }
+  }
+
+  private prerreservarEntradaSecuencial(
+    index: number,
+    tokenUsuario: string,
+    idTurno: number | undefined,
+    tokenPrerreserva: string | null,
+  ): void {
+    const entrada = this.entradas[index];
+    if (!entrada) {
+      this.loadingPrerreserva = false;
+      this.detenerPollingCola();
+      this.finalizarTurnoCola(tokenUsuario);
+      this.guardarCompraPendiente();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.reservasService.prerreservar(entrada.id, tokenUsuario, idTurno, tokenPrerreserva).subscribe({
+      next: prerreserva => {
+        this.prerreserva = prerreserva;
+        this.importe = prerreserva.precio / 100;
+
+        if (index + 1 >= this.entradas.length) {
+          this.loadingPrerreserva = false;
+          this.detenerPollingCola();
+          this.finalizarTurnoCola(tokenUsuario);
+          this.guardarCompraPendiente();
+          this.cdr.detectChanges();
+          return;
+        }
+
+        this.prerreservarEntradaSecuencial(index + 1, tokenUsuario, idTurno, prerreserva.tokenEntrada);
+      },
+      error: err => {
+        this.loadingPrerreserva = false;
+        if (err.status === 401) {
+          this.auth.logout();
+          this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
+          return;
+        }
+        this.error = this.mensajeError(err, 'No se pudo prerreservar la entrada.');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  private finalizarTurnoCola(tokenUsuario: string): void {
+    const idTurno = this.turnoCola?.idTurno;
+    if (!idTurno || this.turnoCola?.colaActiva === false) {
+      return;
+    }
+
+    this.colaService.finalizar(idTurno, tokenUsuario).subscribe({
+      next: turno => {
+        this.turnoCola = turno;
+        this.guardarCompraPendiente();
+        this.cdr.detectChanges();
+      },
+      error: () => undefined,
+    });
+  }
+
+  private cargarCompraPendiente(): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+
+    const raw = sessionStorage.getItem(this.COMPRA_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const compraPendiente = JSON.parse(raw) as {
+        entrada?: EntradaDisponible;
+        entradas?: EntradaDisponible[];
+        espectaculo?: EspectaculoDto;
+        turnoCola?: TurnoColaResponse;
+        prerreserva?: PrerreservaResponse;
+        pagoPreparado?: PagoPreparadoResponse;
+      };
+
+      this.entradas = compraPendiente.entradas ?? (
+        compraPendiente.entrada ? [compraPendiente.entrada] : []
+      );
+      this.entrada = this.entradas[0];
+      this.espectaculo = compraPendiente.espectaculo;
+      this.turnoCola = compraPendiente.turnoCola;
+
+      if (compraPendiente.prerreserva && this.prerreservaActiva(compraPendiente.prerreserva)) {
+        this.prerreserva = compraPendiente.prerreserva;
+        this.pagoPreparado = compraPendiente.pagoPreparado;
+        this.clientSecret = compraPendiente.pagoPreparado?.clientSecret ?? '';
+        if (this.esPagoStripePendiente()) {
+          setTimeout(() => this.montarFormularioStripe(), 0);
+        }
+      }
+    } catch {
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+    }
+  }
+
+  private guardarCompraPendiente(): void {
+    if (typeof sessionStorage === 'undefined' || !this.entradas.length) {
+      return;
+    }
+
+    sessionStorage.setItem(
+      this.COMPRA_STORAGE_KEY,
+      JSON.stringify({
+        entrada: this.entradas[0],
+        entradas: this.entradas,
+        espectaculo: this.espectaculo,
+        turnoCola: this.turnoCola,
+        prerreserva: this.prerreserva,
+        pagoPreparado: this.pagoPreparado,
+      }),
+    );
+  }
+
+  private limpiarCompraPendiente(): void {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(this.COMPRA_STORAGE_KEY);
+    }
+  }
+
+  private prerreservaActiva(prerreserva: PrerreservaResponse): boolean {
+    return new Date(prerreserva.expiraEn).getTime() > Date.now();
+  }
+
+  private procesarTurnoCola(turno: TurnoColaResponse): void {
+    this.turnoCola = turno;
+    this.loadingCola = false;
+    this.guardarCompraPendiente();
+
+    if (!turno.colaActiva || turno.puedePrerreservar) {
+      this.detenerPollingCola();
+      this.crearPrerreserva();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (turno.estado === 'ESPERANDO') {
+      this.iniciarPollingCola();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.detenerPollingCola();
+    this.error = turno.mensaje || 'El turno de cola no esta disponible. Entra de nuevo en la cola.';
+    this.cdr.detectChanges();
+  }
+
+  private iniciarPollingCola(): void {
+    if (this.colaPollingId || typeof window === 'undefined') {
+      return;
+    }
+
+    this.colaPollingId = setInterval(() => this.consultarEstadoCola(), 5000);
+  }
+
+  private consultarEstadoCola(): void {
+    const tokenUsuario = this.auth.getToken();
+    const idTurno = this.turnoCola?.idTurno;
+    if (!tokenUsuario || !idTurno) {
+      this.detenerPollingCola();
+      return;
+    }
+
+    this.colaService.estado(idTurno, tokenUsuario).subscribe({
+      next: turno => this.procesarTurnoCola(turno),
+      error: err => {
+        this.detenerPollingCola();
+        this.error = this.mensajeError(err, 'No se pudo consultar el estado de la cola.');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  private detenerPollingCola(): void {
+    if (!this.colaPollingId) {
+      return;
+    }
+    clearInterval(this.colaPollingId);
+    this.colaPollingId = undefined;
+  }
+
+  private mensajeError(err: any, fallback: string): string {
+    if (typeof err.error === 'string') {
+      return err.error;
+    }
+    return err.error?.message ?? fallback;
   }
 
   private esPagoStripePendiente(): boolean {

@@ -1,0 +1,57 @@
+.cuenta-card {
+  max-width: 520px;
+  margin: 48px auto;
+  padding: 28px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px) saturate(145%);
+  animation: rise-in 460ms ease both;
+}
+
+.cuenta-card h2 {
+  margin-top: 0;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  letter-spacing: 0;
+}
+
+.cuenta-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.acciones {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+button.danger {
+  color: #fff8e6;
+  background: linear-gradient(180deg, #e5486d, #a8173f);
+  box-shadow: 0 12px 28px rgba(229, 72, 109, 0.22);
+}
+
+.links {
+  margin-top: 1rem;
+}
+
+@media (max-width: 560px) {
+  .acciones,
+  .cuenta-info {
+    flex-direction: column;
+  }
+
+  .acciones button {
+    width: 100%;
+  }
+}

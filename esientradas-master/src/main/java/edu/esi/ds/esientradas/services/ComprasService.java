@@ -1,6 +1,7 @@
 package edu.esi.ds.esientradas.services;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,55 +42,87 @@ public class ComprasService {
         if (tokenEntrada == null || tokenEntrada.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token de la entrada es requerido");
         }
+
         if (emailUsuario == null || emailUsuario.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no validado");
         }
 
-        Entrada entrada = this.entradaDao.findByTokenPrerreservaForUpdate(tokenEntrada)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe una prerreserva con ese token"));
+        List<Entrada> entradas = this.entradaDao.findByTokenPrerreservaForUpdate(tokenEntrada);
 
-        if (entrada.getEstado() != Estado.PRERRESERVADA) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "La entrada no está prerreservada");
+        if (entradas.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe una prerreserva con ese token");
         }
 
-        if (prerreservaExpirada(entrada)) {
-            liberarPrerreserva(entrada);
-            this.entradaDao.save(entrada);
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva ha expirado");
+        for (Entrada entrada : entradas) {
+            if (entrada.getEstado() != Estado.PRERRESERVADA) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Una entrada no está prerreservada");
+            }
+
+            if (prerreservaExpirada(entrada)) {
+                liberarPrerreserva(entrada);
+                this.entradaDao.save(entrada);
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva ha expirado");
+            }
+
+            if (!emailUsuario.equalsIgnoreCase(entrada.getUsuarioPrerreserva())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro usuario");
+            }
         }
 
-        if (!emailUsuario.equalsIgnoreCase(entrada.getUsuarioPrerreserva())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro usuario");
-        }
+        long precioTotal = entradas.stream()
+            .mapToLong(Entrada::getPrecio)
+            .sum();
 
         Pago pago = this.pagosService.confirmarPagoPreparado(
-            entrada.getPrecio(),
-            "Compra de entrada " + entrada.getId(),
+            precioTotal,
+            "Compra de " + entradas.size() + " entrada(s)",
             tokenPago
         );
 
-        entrada.setEstado(Estado.VENDIDA);
-        entrada.setTokenPrerreserva(null);
-        entrada.setPrerreservaExpiraEn(null);
-        entrada.setUsuarioPrerreserva(null);
-        this.entradaDao.save(entrada);
+        for (Entrada entrada : entradas) {
+            entrada.setEstado(Estado.VENDIDA);
+            entrada.setTokenPrerreserva(null);
+            entrada.setPrerreservaExpiraEn(null);
+            entrada.setUsuarioPrerreserva(null);
+        }
 
-        Compra compra = crearCompra(entrada, emailUsuario, pago);
-        compra = this.compraDao.save(compra);
-        boolean emailEnviado = this.compraEmailService.enviarConfirmacion(compra);
+        this.entradaDao.saveAll(entradas);
+
+        Compra primeraCompra = null;
+        boolean emailEnviado = true;
+        StringBuilder codigos = new StringBuilder();
+
+        for (Entrada entrada : entradas) {
+            Compra compra = crearCompra(entrada, emailUsuario, pago);
+            compra = this.compraDao.save(compra);
+
+            if (primeraCompra == null) {
+                primeraCompra = compra;
+            }
+
+            if (!codigos.isEmpty()) {
+                codigos.append(", ");
+            }
+            codigos.append(compra.getCodigoEntrada());
+
+            boolean enviado = this.compraEmailService.enviarConfirmacion(compra);
+            emailEnviado = emailEnviado && enviado;
+        }
+
+        Entrada primeraEntrada = entradas.get(0);
 
         String mensaje = "Compra completada para el usuario: " + emailUsuario
-            + " con la entrada: " + entrada.getId()
-            + ". Codigo: " + compra.getCodigoEntrada();
+            + " con " + entradas.size() + " entrada(s). Codigos: " + codigos;
+
         return new DtoCompra(
-            compra.getId(),
-            entrada.getId(),
-            entrada.getPrecio(),
-            entrada.getEstado().name(),
+            primeraCompra.getId(),
+            primeraEntrada.getId(),
+            precioTotal,
+            primeraEntrada.getEstado().name(),
             emailUsuario,
-            compra.getCodigoEntrada(),
-            compra.getReferenciaPago(),
-            compra.getMetodoPago(),
+            codigos.toString(),
+            primeraCompra.getReferenciaPago(),
+            primeraCompra.getMetodoPago(),
             pago.getEstado(),
             emailEnviado,
             mensaje

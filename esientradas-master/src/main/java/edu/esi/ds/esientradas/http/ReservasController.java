@@ -1,6 +1,8 @@
 package edu.esi.ds.esientradas.http;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,8 +41,22 @@ public class ReservasController {
     public DtoPrerreserva prerreservar(
             @RequestParam Long idEntrada,
             @RequestParam String tokenUsuario,
-            @RequestParam(required = false) Long idTurno) {
+            @RequestParam(required = false) Long idTurno,
+            @RequestParam(required = false) String tokenPrerreserva) {
+
         String email = this.usuariosService.checkToken(tokenUsuario);
-        return this.service.prerreservar(idEntrada, email, idTurno);
+
+        return this.service.prerreservar(idEntrada, email, idTurno, tokenPrerreserva);
+    }
+
+    @DeleteMapping("/prerreservar/{idEntrada}")
+    public void liberarEntradaPrerreservada(
+            @PathVariable Long idEntrada,
+            @RequestParam String tokenUsuario,
+            @RequestParam String tokenPrerreserva) {
+
+        String email = this.usuariosService.checkToken(tokenUsuario);
+
+        this.service.liberarEntradaPrerreservada(tokenPrerreserva, idEntrada, email);
     }
 }

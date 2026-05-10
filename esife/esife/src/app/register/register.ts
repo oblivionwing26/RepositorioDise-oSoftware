@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component } from "@angular/core";
-import { FormsModule } from "@angular/forms";
+import { FormsModule, NgForm } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
 import { Auth } from "../services/auth";
 
@@ -19,10 +19,26 @@ export class Register {
   loading = false;
   ok = false;
 
-  constructor(private auth: Auth, private router: Router, private cdr: ChangeDetectorRef) {}
+  constructor(
+    private auth: Auth,
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) {}
 
-  private validClient(p: string): boolean{
+ validClient(p: string): boolean {
     return p.length >= 8 && /[A-Za-z]/.test(p) && /\d/.test(p);
+  }
+
+  tieneLetraYNumero(p: string): boolean {
+    return /[A-Za-z]/.test(p) && /\d/.test(p);
+  }
+
+  formularioInvalido(f: NgForm): boolean {
+    return (
+      f.invalid ||
+      this.password !== this.confirm ||
+      !this.validClient(this.password)
+    );
   }
   
   submit(): void {
@@ -33,12 +49,14 @@ export class Register {
       this.error = 'Las contraseñas no coinciden.';
       return;
     }
+
     if (!this.validClient(this.password)) {
       this.error = 'La contraseña debe tener al menos 8 caracteres, incluir letras y números.';
       return;
     }
 
     this.loading = true;
+
     this.auth.register(this.email, this.password).subscribe({
       next: () => {
         this.loading = false;
@@ -47,15 +65,19 @@ export class Register {
         setTimeout(() => this.router.navigate(['/login']), 1200);
       },
       error: err => {
+        console.error('Registro fallido:', err);
+
         this.loading = false;
-        this.error = err.status === 409
-          ? 'El correo ya está registrado.'
-          : err.status === 400
-            ? 'Datos inválidos. Revisa email y contraseña.'
-            : 'Error al registrar la cuenta.';
-          this.cdr.detectChanges();
+        this.error = err.status === 0
+          ? 'No se pudo conectar al servidor. Intenta más tarde.'
+          : err.status === 409
+            ? 'El correo ya está registrado.'
+            : err.status === 400
+              ? 'Datos inválidos. Revisa email y contraseña.'
+              : 'Error al registrar la cuenta.';
+
+        this.cdr.detectChanges();
       }
     });
   }
 }
-

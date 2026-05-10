@@ -1,0 +1,4 @@
+input.ng-invalid.ng-touched,
+input.ng-invalid.ng-dirty {
+  border-color: var(--danger);
+}

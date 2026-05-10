@@ -32,7 +32,7 @@ public interface EntradaDao extends JpaRepository<Entrada, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Entrada e where e.tokenPrerreserva = :tokenEntrada")
-    Optional<Entrada> findByTokenPrerreservaForUpdate(@Param("tokenEntrada") String tokenEntrada);
+    List<Entrada> findByTokenPrerreservaForUpdate(@Param("tokenEntrada") String tokenEntrada);
 
     @Modifying
     @Query("""
@@ -49,4 +49,6 @@ public interface EntradaDao extends JpaRepository<Entrada, Long> {
         @Param("estadoPrerreservada") Estado estadoPrerreservada,
         @Param("now") java.time.LocalDateTime now
     );
+
+    List<Entrada> findByTokenPrerreserva(String tokenPrerreserva);
 }

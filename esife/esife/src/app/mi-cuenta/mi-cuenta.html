@@ -1,0 +1,34 @@
+<section class="cuenta-card">
+  <h2>Mi cuenta</h2>
+
+  <p class="muted">
+    Desde aquí puedes gestionar tu cuenta de usuario.
+  </p>
+
+  <div class="cuenta-info">
+    <span>Estado:</span>
+    <strong>{{ auth.isLogged() ? 'Sesión iniciada' : 'No has iniciado sesión' }}</strong>
+  </div>
+
+  <div class="acciones">
+    <button type="button" (click)="cerrarSesion()" [disabled]="loading">
+      Cerrar sesión
+    </button>
+
+    <button
+      type="button"
+      class="danger"
+      (click)="cancelarCuenta()"
+      [disabled]="loading || !auth.isLogged()"
+    >
+      {{ loading ? 'Cancelando...' : 'Cancelar cuenta' }}
+    </button>
+  </div>
+
+  <p *ngIf="mensaje" class="ok">{{ mensaje }}</p>
+  <p *ngIf="error" class="error">{{ error }}</p>
+
+  <p class="links">
+    <a routerLink="/">Volver a espectáculos</a>
+  </p>
+</section>

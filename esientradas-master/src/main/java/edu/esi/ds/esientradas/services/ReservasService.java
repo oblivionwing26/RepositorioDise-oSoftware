@@ -1,6 +1,7 @@
 package edu.esi.ds.esientradas.services;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,10 +56,11 @@ public class ReservasService {
     }
 
     @Transactional
-    public DtoPrerreserva prerreservar(Long idEntrada, String email, Long idTurno) {
+    public DtoPrerreserva prerreservar(Long idEntrada, String email, Long idTurno, String tokenPrerreservaActual) {
         if (idEntrada == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El id de entrada es requerido");
         }
+
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no validado");
         }
@@ -69,19 +71,69 @@ public class ReservasService {
         this.colaService.validarTurnoActivo(entrada.getEspectaculo().getId(), email, idTurno);
 
         LocalDateTime now = LocalDateTime.now();
+
         if (entrada.getEstado() == Estado.PRERRESERVADA && prerreservaExpirada(entrada, now)) {
             liberarPrerreserva(entrada);
+            this.entradaDao.save(entrada);
+        }
+
+        String tokenEntrada = tokenPrerreservaActual;
+        List<Entrada> entradasYaPrerreservadas = List.of();
+
+        if (tokenEntrada == null || tokenEntrada.isBlank()) {
+            tokenEntrada = UUID.randomUUID().toString();
+        } else {
+            entradasYaPrerreservadas = this.entradaDao.findByTokenPrerreservaForUpdate(tokenEntrada);
+
+            if (entradasYaPrerreservadas.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva anterior no existe o ha expirado");
+            }
+
+            for (Entrada e : entradasYaPrerreservadas) {
+                if (prerreservaExpirada(e, now)) {
+                    liberarPrerreserva(e);
+                    this.entradaDao.save(e);
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva anterior ha expirado");
+                }
+
+                if (!email.equalsIgnoreCase(e.getUsuarioPrerreserva())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro usuario");
+                }
+
+                if (!entrada.getEspectaculo().getId().equals(e.getEspectaculo().getId())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro espectaculo");
+                }
+            }
+        }
+
+        if (entrada.getEstado() == Estado.PRERRESERVADA
+            && tokenEntrada.equals(entrada.getTokenPrerreserva())) {
+
+            List<Entrada> entradas = this.entradaDao.findByTokenPrerreserva(tokenEntrada);
+            long precioTotal = entradas.stream().mapToLong(Entrada::getPrecio).sum();
+
+            return new DtoPrerreserva(
+                entrada.getId(),
+                tokenEntrada,
+                entrada.getPrerreservaExpiraEn(),
+                precioTotal
+            );
         }
 
         if (entrada.getEstado() == Estado.VENDIDA) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La entrada ya está vendida");
         }
+
         if (entrada.getEstado() != Estado.DISPONIBLE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La entrada no está disponible");
         }
 
-        String tokenEntrada = UUID.randomUUID().toString();
-        LocalDateTime expiraEn = now.plusMinutes(prerreservaExpirationMinutes);
+        LocalDateTime expiraEn = entradasYaPrerreservadas.isEmpty()
+            ? now.plusMinutes(prerreservaExpirationMinutes)
+            : entradasYaPrerreservadas.stream()
+                .map(Entrada::getPrerreservaExpiraEn)
+                .min(LocalDateTime::compareTo)
+                .orElse(now.plusMinutes(prerreservaExpirationMinutes));
 
         entrada.setEstado(Estado.PRERRESERVADA);
         entrada.setTokenPrerreserva(tokenEntrada);
@@ -89,9 +141,15 @@ public class ReservasService {
         entrada.setUsuarioPrerreserva(email);
         this.entradaDao.save(entrada);
 
-        this.colaService.finalizarTurnoActivo(entrada.getEspectaculo().getId(), email, idTurno);
+        List<Entrada> entradas = this.entradaDao.findByTokenPrerreserva(tokenEntrada);
+        long precioTotal = entradas.stream().mapToLong(Entrada::getPrecio).sum();
 
-        return new DtoPrerreserva(entrada.getId(), tokenEntrada, expiraEn, entrada.getPrecio());
+        return new DtoPrerreserva(
+            entrada.getId(),
+            tokenEntrada,
+            expiraEn,
+            precioTotal
+        );
     }
 
     @Scheduled(fixedRateString = "${app.prerreserva.cleanup-rate-ms:60000}")
@@ -113,6 +171,31 @@ public class ReservasService {
         entrada.setTokenPrerreserva(null);
         entrada.setPrerreservaExpiraEn(null);
         entrada.setUsuarioPrerreserva(null);
+    }
+
+    @Transactional
+    public void liberarEntradaPrerreservada(String tokenEntrada, Long idEntrada, String email) {
+        if (tokenEntrada == null || tokenEntrada.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token de prerreserva es requerido");
+        }
+
+        Entrada entrada = this.entradaDao.findByIdForUpdate(idEntrada)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entrada no encontrada"));
+
+        if (entrada.getEstado() != Estado.PRERRESERVADA) {
+            return;
+        }
+
+        if (!tokenEntrada.equals(entrada.getTokenPrerreserva())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La entrada no pertenece a esta prerreserva");
+        }
+
+        if (!email.equalsIgnoreCase(entrada.getUsuarioPrerreserva())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro usuario");
+        }
+
+        liberarPrerreserva(entrada);
+        this.entradaDao.save(entrada);
     }
 
 }

@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,8 +61,20 @@ public class UserService {
         validateEmail(email);
         passwordPolicy.validate(req.getPassword());
 
-        if (userDao.existsByEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya esta registrado");
+        Optional<User> existingUser = userDao.findByEmail(email);
+
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+
+            if (user.isActive()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya esta registrado");
+            }
+
+            // Si la cuenta estaba cancelada, la reactivamos
+            user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+            user.setActive(true);
+            userDao.save(user);
+            return;
         }
 
         User user = new User();

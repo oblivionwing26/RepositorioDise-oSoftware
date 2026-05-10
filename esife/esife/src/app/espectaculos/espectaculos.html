@@ -6,10 +6,138 @@
     </button>
   </header>
 
+  <form class="buscador" (ngSubmit)="buscarEspectaculos()">
+    <input
+      type="search"
+      name="busquedaArtista"
+      [(ngModel)]="busquedaArtista"
+      placeholder="Buscar espectáculo por artista..."
+    />
+
+    <select
+      name="filtroEscenario"
+      [(ngModel)]="filtroEscenario"
+    >
+      <option value="">Todos los escenarios</option>
+      <option *ngFor="let escenario of escenariosDisponiblesFiltro" [value]="escenario">
+        {{ escenario }}
+      </option>
+    </select>
+
+    <input
+      type="date"
+      name="filtroFecha"
+      [(ngModel)]="filtroFecha"
+      [disabled]="!resultadosBusqueda.length"
+    />
+
+    <button type="submit" [disabled]="loadingBusqueda || !busquedaArtista.trim()">
+      {{ loadingBusqueda ? 'Buscando...' : 'Buscar' }}
+    </button>
+
+    <button type="button" *ngIf="busquedaRealizada" (click)="limpiarBusqueda()">
+      Limpiar
+    </button>
+  </form>
+
   <p *ngIf="error" class="error">{{ error }}</p>
 
-  <ol class="escenarios">
-    <li *ngFor="let escenario of escenarios" class="escenario">
+  <p *ngIf="mensajeCarrito" class="error">{{ mensajeCarrito }}</p>
+
+  <section *ngIf="carrito.length" class="carrito">
+    <h2>Entradas seleccionadas</h2>
+    <p *ngIf="reservaHasta" class="muted">
+      Las entradas están prerreservadas hasta: {{ reservaHasta | date:'short' }}
+    </p>
+
+    <ul>
+      <li *ngFor="let item of carrito">
+        <div>
+          <strong>{{ item.espectaculo.artista }}</strong>
+          <span class="muted">
+            {{ item.espectaculo.fecha }} · {{ item.espectaculo.escenario }}
+          </span>
+          <span>
+            {{ etiquetaEntrada(item.entrada) }} ·
+            {{ item.entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}
+          </span>
+        </div>
+
+        <button type="button" (click)="quitarDelCarrito(item.entrada)">
+          Quitar
+        </button>
+      </li>
+    </ul>
+
+    <div class="carrito__total">
+      <strong>Total:</strong>
+      <span>{{ totalCarritoCentimos() / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
+    </div>
+
+    <div class="carrito__actions">
+      <button type="button" (click)="vaciarCarrito()">
+        Vaciar selección
+      </button>
+
+      <button type="button" (click)="comprarCarrito()">
+        Comprar selección
+      </button>
+    </div>
+  </section>
+
+  <section *ngIf="busquedaRealizada" class="resultados-busqueda">
+    <h2>Resultados de búsqueda</h2>
+
+    <p *ngIf="loadingBusqueda" class="muted">Buscando espectáculos...</p>
+
+    <p *ngIf="!loadingBusqueda && !resultadosFiltrados.length" class="muted">
+      No se encontraron espectáculos con esos criterios.
+    </p>
+
+    <ul *ngIf="resultadosFiltrados.length" class="espectaculos">
+      <li *ngFor="let espectaculo of resultadosFiltrados" class="espectaculo">
+        <div class="espectaculo__main">
+          <span class="espectaculo__title">{{ espectaculo.artista }}</span>
+          <span class="muted">{{ espectaculo.fecha }} · {{ espectaculo.escenario }}</span>
+
+          <button
+            type="button"
+            (click)="getNumeroDeEntradas(espectaculo)"
+            [disabled]="espectaculo.loadingEntradas"
+          >
+            {{ espectaculo.loadingEntradas ? 'Cargando...' : 'Ver entradas' }}
+          </button>
+        </div>
+
+        <section *ngIf="espectaculo.entradas" class="disponibilidad">
+          <div class="resumen">
+            <span>Total: {{ espectaculo.entradas.total }}</span>
+            <span>Libres: {{ espectaculo.entradas.libres }}</span>
+            <span>Reservadas: {{ espectaculo.entradas.reservadas }}</span>
+            <span>Vendidas: {{ espectaculo.entradas.vendidas }}</span>
+          </div>
+
+          <p *ngIf="!espectaculo.entradasDisponibles?.length" class="muted">
+            No hay entradas libres para este espectáculo.
+          </p>
+
+          <ul *ngIf="espectaculo.entradasDisponibles?.length" class="entradas">
+            <li *ngFor="let entrada of espectaculo.entradasDisponibles" class="entrada">
+              <span>{{ etiquetaEntrada(entrada) }}</span>
+              <span>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
+
+              <button type="button" (click)="toggleEntrada(espectaculo, entrada)">
+                {{ estaSeleccionada(entrada) ? 'Quitar' : 'Seleccionar' }}
+              </button>
+            </li>
+          </ul>
+        </section>
+      </li>
+    </ul>
+  </section>
+
+  <ol *ngIf="!busquedaRealizada" class="escenarios">
+    <li *ngFor="let escenario of escenariosFiltrados" class="escenario">
       <button type="button" class="escenario__button" (click)="getEspectaculos(escenario)">
         <strong>{{ escenario.nombre }}</strong>
         <span>{{ escenario.descripcion }}</span>
@@ -41,7 +169,9 @@
               <li *ngFor="let entrada of espectaculo.entradasDisponibles" class="entrada">
                 <span>{{ etiquetaEntrada(entrada) }}</span>
                 <span>{{ entrada.precio / 100 | currency:'EUR':'symbol':'1.2-2' }}</span>
-                <button type="button" (click)="seleccionarEntrada(espectaculo, entrada)">Comprar</button>
+                <button type="button" (click)="toggleEntrada(espectaculo, entrada)">
+                  {{ estaSeleccionada(entrada) ? 'Quitar' : 'Seleccionar' }}
+                </button>
               </li>
             </ul>
           </section>

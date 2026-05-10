@@ -1,23 +1,71 @@
 <section class="auth-card">
   <h2>Crear cuenta</h2>
 
-  <form (ngSubmit)="submit()" #f="ngForm">
+  <form (ngSubmit)="submit()" #f="ngForm" novalidate>
     <label>
       Email
-      <input type="email" name="email" [(ngModel)]="email" required />
+      <input
+        type="email"
+        name="email"
+        [(ngModel)]="email"
+        required
+        email
+        #emailCtrl="ngModel"
+      />
     </label>
+
+    <p class="error" *ngIf="(emailCtrl.dirty || emailCtrl.touched) && emailCtrl.errors?.['required']">
+      El correo es obligatorio.
+    </p>
+
+    <p class="error" *ngIf="(emailCtrl.dirty || emailCtrl.touched) && emailCtrl.errors?.['email']">
+      Introduce un correo válido.
+    </p>
 
     <label>
       Contraseña
-      <input type="password" name="password" [(ngModel)]="password" required minlength="8" />
+      <input
+        type="password"
+        name="password"
+        [(ngModel)]="password"
+        required
+        minlength="8"
+        #passwordCtrl="ngModel"
+      />
     </label>
+
+    <p class="error" *ngIf="(passwordCtrl.dirty || passwordCtrl.touched) && passwordCtrl.errors?.['required']">
+      La contraseña es obligatoria.
+    </p>
+
+    <p class="error" *ngIf="(passwordCtrl.dirty || passwordCtrl.touched) && passwordCtrl.errors?.['minlength']">
+      La contraseña debe tener al menos 8 caracteres.
+    </p>
+
+    <p class="error" *ngIf="(passwordCtrl.dirty || passwordCtrl.touched) && password && !tieneLetraYNumero(password)">
+      La contraseña debe incluir letras y números.
+    </p>
 
     <label>
       Repite la contraseña
-      <input type="password" name="confirm" [(ngModel)]="confirm" required />
+      <input
+        type="password"
+        name="confirm"
+        [(ngModel)]="confirm"
+        required
+        #confirmCtrl="ngModel"
+      />
     </label>
 
-    <button type="submit" [disabled]="loading || !f.valid">
+    <p class="error" *ngIf="(confirmCtrl.dirty || confirmCtrl.touched) && confirmCtrl.errors?.['required']">
+      Debes repetir la contraseña.
+    </p>
+
+    <p class="error" *ngIf="(confirmCtrl.dirty || confirmCtrl.touched) && confirm && password !== confirm">
+      Las contraseñas no coinciden.
+    </p>
+
+    <button type="submit" [disabled]="loading || formularioInvalido(f)">
       {{ loading ? 'Creando…' : 'Registrarse' }}
     </button>
   </form>

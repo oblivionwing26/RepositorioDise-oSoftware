@@ -6,6 +6,27 @@
   animation: rise-in 460ms ease both;
 }
 
+.buscador {
+  display: grid;
+  grid-template-columns: 1fr 220px 180px auto auto;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  align-items: center;
+}
+
+.buscador {
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px) saturate(135%);
+}
+
+.resultados-busqueda {
+  margin-top: 1rem;
+}
+
 .catalogo__header,
 .espectaculo__main,
 .entrada,
@@ -135,17 +156,87 @@ button {
   cursor: pointer;
 }
 
+.carrito {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px) saturate(135%);
+}
+
+.carrito h2,
+.resultados-busqueda h2 {
+  margin-top: 0;
+  color: var(--soft);
+}
+
+.carrito ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.carrito li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.carrito li div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.carrito li:last-child {
+  border-bottom: none;
+}
+
+.carrito__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.carrito__actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .buscador {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .catalogo__header,
   .espectaculo__main,
-  .entrada {
+  .entrada,
+  .carrito li,
+  .carrito__total,
+  .carrito__actions {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .buscador {
+    grid-template-columns: 1fr;
+  }
+
   .catalogo__header button,
   .espectaculo__main button,
-  .entrada button {
+  .entrada button,
+  .carrito button {
     width: 100%;
   }
 }
