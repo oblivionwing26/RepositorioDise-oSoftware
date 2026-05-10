@@ -62,7 +62,7 @@ public class ReservasService {
         }
 
         if (email == null || email.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no validado");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Cliente no validado");
         }
 
         Entrada entrada = this.entradaDao.findByIdForUpdate(idEntrada)
@@ -188,6 +188,10 @@ public class ReservasService {
 
         if (!tokenEntrada.equals(entrada.getTokenPrerreserva())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La entrada no pertenece a esta prerreserva");
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Cliente no validado");
         }
 
         if (!email.equalsIgnoreCase(entrada.getUsuarioPrerreserva())) {

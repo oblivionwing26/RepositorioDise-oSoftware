@@ -146,6 +146,37 @@ textarea:focus {
 	font-weight: 700;
 }
 
+.password-field {
+	position: relative;
+	display: block;
+}
+
+.password-field input {
+	padding-right: 3.1rem;
+}
+
+.auth-card .password-toggle {
+	position: absolute;
+	top: 50%;
+	right: 0.42rem;
+	display: inline-grid;
+	width: 2.35rem;
+	min-height: 2.35rem;
+	margin: 0;
+	padding: 0;
+	place-items: center;
+	color: var(--accent);
+	font-size: 1.05rem;
+	background: rgba(255, 255, 255, 0.08);
+	box-shadow: none;
+	transform: translateY(-50%);
+}
+
+.auth-card .password-toggle:hover:not(:disabled) {
+	box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.24);
+	transform: translateY(-50%);
+}
+
 .auth-card button {
 	width: 100%;
 	margin-top: 6px;

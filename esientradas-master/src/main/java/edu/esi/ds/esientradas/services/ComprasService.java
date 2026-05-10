@@ -64,7 +64,9 @@ public class ComprasService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva ha expirado");
             }
 
-            if (!emailUsuario.equalsIgnoreCase(entrada.getUsuarioPrerreserva())) {
+            String propietarioPrerreserva = entrada.getUsuarioPrerreserva();
+            boolean prerreservaAnonima = propietarioPrerreserva != null && propietarioPrerreserva.startsWith("anon:");
+            if (!prerreservaAnonima && !emailUsuario.equalsIgnoreCase(propietarioPrerreserva)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "La prerreserva pertenece a otro usuario");
             }
         }

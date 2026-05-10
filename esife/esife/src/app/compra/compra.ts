@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { PagoPreparadoResponse, Pagos } from '../pagos';
 import { Auth } from '../services/auth';
+import { ClienteAnonimoService } from '../services/cliente-anonimo';
 import { ColaService, TurnoColaResponse } from '../services/cola';
 import { CompraResponse, ComprasService } from '../services/compras';
 import { PrerreservaResponse, ReservasService } from '../services/reservas';
@@ -88,6 +89,7 @@ export class Compra implements OnInit, OnDestroy {
     private reservasService: ReservasService,
     private colaService: ColaService,
     private auth: Auth,
+    private clienteAnonimo: ClienteAnonimoService,
     private router: Router,
     private cdr: ChangeDetectorRef,
   ) {}
@@ -98,11 +100,6 @@ export class Compra implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    if (!this.auth.isLogged()) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-      return;
-    }
-
     const navigationState = history.state as {
       entrada?: EntradaDisponible;
       entradas?: EntradaDisponible[];
@@ -165,11 +162,8 @@ export class Compra implements OnInit, OnDestroy {
   entrarEnCola(): void {
     this.error = null;
 
-    const tokenUsuario = this.auth.getToken();
-    if (!tokenUsuario) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-      return;
-    }
+    const tokenUsuario = null;
+    const clienteId = this.clienteAnonimo.getId();
 
     if (!this.espectaculo?.id) {
       this.error = 'No se pudo identificar el espectáculo para entrar en cola.';
@@ -177,7 +171,7 @@ export class Compra implements OnInit, OnDestroy {
     }
 
     this.loadingCola = true;
-    this.colaService.entrar(this.espectaculo.id, tokenUsuario).subscribe({
+    this.colaService.entrar(this.espectaculo.id, tokenUsuario, clienteId).subscribe({
       next: turno => this.procesarTurnoCola(turno),
       error: err => {
         this.loadingCola = false;
@@ -195,11 +189,8 @@ export class Compra implements OnInit, OnDestroy {
   crearPrerreserva(): void {
     this.error = null;
 
-    const tokenUsuario = this.auth.getToken();
-    if (!tokenUsuario) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-      return;
-    }
+    const tokenUsuario = null;
+    const clienteId = this.clienteAnonimo.getId();
 
     if (!this.entradas.length) {
       this.error = 'Selecciona al menos una entrada libre antes de prerreservar.';
@@ -213,7 +204,7 @@ export class Compra implements OnInit, OnDestroy {
     }
 
     this.loadingPrerreserva = true;
-    this.prerreservarEntradaSecuencial(0, tokenUsuario, idTurno, this.prerreserva?.tokenEntrada ?? null);
+    this.prerreservarEntradaSecuencial(0, tokenUsuario, clienteId, idTurno, this.prerreserva?.tokenEntrada ?? null);
   }
 
   comprar(): void {
@@ -275,6 +266,12 @@ export class Compra implements OnInit, OnDestroy {
     this.error = null;
     this.stripeError = null;
     this.stripeMensaje = null;
+
+    if (!this.auth.isLogged()) {
+      this.guardarCompraPendiente();
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
+      return;
+    }
 
     if (!this.prerreserva) {
       this.error = 'Primero hay que prerreservar la entrada.';
@@ -358,7 +355,8 @@ export class Compra implements OnInit, OnDestroy {
 
   private prerreservarEntradaSecuencial(
     index: number,
-    tokenUsuario: string,
+    tokenUsuario: string | null,
+    clienteId: string,
     idTurno: number | undefined,
     tokenPrerreserva: string | null,
   ): void {
@@ -366,13 +364,13 @@ export class Compra implements OnInit, OnDestroy {
     if (!entrada) {
       this.loadingPrerreserva = false;
       this.detenerPollingCola();
-      this.finalizarTurnoCola(tokenUsuario);
+      this.finalizarTurnoCola(tokenUsuario, clienteId);
       this.guardarCompraPendiente();
       this.cdr.detectChanges();
       return;
     }
 
-    this.reservasService.prerreservar(entrada.id, tokenUsuario, idTurno, tokenPrerreserva).subscribe({
+    this.reservasService.prerreservar(entrada.id, tokenUsuario, clienteId, idTurno, tokenPrerreserva).subscribe({
       next: prerreserva => {
         this.prerreserva = prerreserva;
         this.importe = prerreserva.precio / 100;
@@ -380,13 +378,13 @@ export class Compra implements OnInit, OnDestroy {
         if (index + 1 >= this.entradas.length) {
           this.loadingPrerreserva = false;
           this.detenerPollingCola();
-          this.finalizarTurnoCola(tokenUsuario);
+          this.finalizarTurnoCola(tokenUsuario, clienteId);
           this.guardarCompraPendiente();
           this.cdr.detectChanges();
           return;
         }
 
-        this.prerreservarEntradaSecuencial(index + 1, tokenUsuario, idTurno, prerreserva.tokenEntrada);
+        this.prerreservarEntradaSecuencial(index + 1, tokenUsuario, clienteId, idTurno, prerreserva.tokenEntrada);
       },
       error: err => {
         this.loadingPrerreserva = false;
@@ -401,13 +399,13 @@ export class Compra implements OnInit, OnDestroy {
     });
   }
 
-  private finalizarTurnoCola(tokenUsuario: string): void {
+  private finalizarTurnoCola(tokenUsuario: string | null, clienteId: string): void {
     const idTurno = this.turnoCola?.idTurno;
     if (!idTurno || this.turnoCola?.colaActiva === false) {
       return;
     }
 
-    this.colaService.finalizar(idTurno, tokenUsuario).subscribe({
+    this.colaService.finalizar(idTurno, tokenUsuario, clienteId).subscribe({
       next: turno => {
         this.turnoCola = turno;
         this.guardarCompraPendiente();
@@ -517,14 +515,15 @@ export class Compra implements OnInit, OnDestroy {
   }
 
   private consultarEstadoCola(): void {
-    const tokenUsuario = this.auth.getToken();
+    const tokenUsuario = null;
+    const clienteId = this.clienteAnonimo.getId();
     const idTurno = this.turnoCola?.idTurno;
-    if (!tokenUsuario || !idTurno) {
+    if (!idTurno) {
       this.detenerPollingCola();
       return;
     }
 
-    this.colaService.estado(idTurno, tokenUsuario).subscribe({
+    this.colaService.estado(idTurno, tokenUsuario, clienteId).subscribe({
       next: turno => this.procesarTurnoCola(turno),
       error: err => {
         this.detenerPollingCola();

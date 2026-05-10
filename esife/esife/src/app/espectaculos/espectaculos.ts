@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { PrerreservaResponse, ReservasService } from '../services/reservas';
 
-import { Auth } from '../services/auth';
+import { ClienteAnonimoService } from '../services/cliente-anonimo';
 import {
   EntradaDisponible,
   EscenarioDto,
@@ -46,7 +46,7 @@ export class Espectaculos implements OnInit {
   constructor(
     private espectaculosService: EspectaculosService,
     private reservasService: ReservasService,
-    private auth: Auth,
+    private clienteAnonimo: ClienteAnonimoService,
     private router: Router,
     private cdr: ChangeDetectorRef
   ) {}
@@ -62,11 +62,6 @@ export class Espectaculos implements OnInit {
 
   toggleEntrada(espectaculo: EspectaculoDto, entrada: EntradaDisponible): void {
     this.mensajeCarrito = null;
-
-    if (!this.auth.getToken()) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/' } });
-      return;
-    }
 
     if (this.estaSeleccionada(entrada)) {
       this.quitarDelCarrito(entrada);
@@ -103,16 +98,16 @@ export class Espectaculos implements OnInit {
   }
 
   quitarDelCarrito(entrada: EntradaDisponible): void {
-    const tokenUsuario = this.auth.getToken();
+    const clienteId = this.clienteAnonimo.getId();
 
-    if (!tokenUsuario || !this.tokenPrerreserva) {
+    if (!this.tokenPrerreserva) {
       this.carrito = this.carrito.filter(item => item.entrada.id !== entrada.id);
       this.guardarCarrito();
       return;
     }
 
     this.reservasService
-      .liberarEntradaPrerreservada(entrada.id, tokenUsuario, this.tokenPrerreserva)
+      .liberarEntradaPrerreservada(entrada.id, null, clienteId, this.tokenPrerreserva)
       .subscribe({
         next: () => {
           entrada.estado = 'DISPONIBLE';
@@ -156,11 +151,6 @@ export class Espectaculos implements OnInit {
     }
 
     this.guardarCarrito();
-
-    if (!this.auth.isLogged()) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-      return;
-    }
 
     const espectaculo = this.carrito[0].espectaculo;
     const entradas = this.carrito.map(item => item.entrada);
@@ -327,11 +317,6 @@ export class Espectaculos implements OnInit {
 
   seleccionarEntrada(espectaculo: EspectaculoDto, entrada: EntradaDisponible): void {
     this.guardarCompraPendiente(espectaculo, entrada);
-
-    if (!this.auth.isLogged()) {
-      this.router.navigate(['/login'], { queryParams: { returnUrl: '/comprar' } });
-      return;
-    }
 
     this.router.navigate(['/comprar'], {
       state: { espectaculo, entrada },

@@ -21,23 +21,46 @@ export class ColaService {
 
   constructor(private http: HttpClient) {}
 
-  entrar(idEspectaculo: number, tokenUsuario: string): Observable<TurnoColaResponse> {
-    const params = new HttpParams()
-      .set('idEspectaculo', idEspectaculo)
-      .set('tokenUsuario', tokenUsuario);
+  entrar(
+    idEspectaculo: number,
+    tokenUsuario?: string | null,
+    clienteId?: string | null,
+  ): Observable<TurnoColaResponse> {
+    let params = this.paramsIdentidad(tokenUsuario, clienteId)
+      .set('idEspectaculo', idEspectaculo);
 
     return this.http.post<TurnoColaResponse>(`${this.COLA_API}/entrar`, null, { params });
   }
 
-  estado(idTurno: number, tokenUsuario: string): Observable<TurnoColaResponse> {
-    const params = new HttpParams().set('tokenUsuario', tokenUsuario);
+  estado(
+    idTurno: number,
+    tokenUsuario?: string | null,
+    clienteId?: string | null,
+  ): Observable<TurnoColaResponse> {
+    const params = this.paramsIdentidad(tokenUsuario, clienteId);
 
     return this.http.get<TurnoColaResponse>(`${this.COLA_API}/estado/${idTurno}`, { params });
   }
 
-  finalizar(idTurno: number, tokenUsuario: string): Observable<TurnoColaResponse> {
-    const params = new HttpParams().set('tokenUsuario', tokenUsuario);
+  finalizar(
+    idTurno: number,
+    tokenUsuario?: string | null,
+    clienteId?: string | null,
+  ): Observable<TurnoColaResponse> {
+    const params = this.paramsIdentidad(tokenUsuario, clienteId);
 
     return this.http.post<TurnoColaResponse>(`${this.COLA_API}/finalizar/${idTurno}`, null, { params });
+  }
+
+  private paramsIdentidad(tokenUsuario?: string | null, clienteId?: string | null): HttpParams {
+    let params = new HttpParams();
+
+    if (tokenUsuario) {
+      params = params.set('tokenUsuario', tokenUsuario);
+    } else if (clienteId) {
+      params = params.set('clienteId', clienteId);
+    }
+
+    return params;
   }
 }

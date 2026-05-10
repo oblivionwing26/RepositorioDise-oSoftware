@@ -20,6 +20,8 @@ export class ResetPassword implements OnInit {
   error: string | null = null;
   ok = false;
   loading = false;
+  mostrarPassword = false;
+  mostrarConfirm = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -36,8 +38,12 @@ export class ResetPassword implements OnInit {
     return p.length >= 8 && /[A-Za-z]/.test(p) && /\d/.test(p);
   }
 
-  submit(): void {
+  submit(tokenValue = this.token, passwordValue = this.newPassword, confirmValue = this.confirm): void {
     this.error = null;
+
+    this.token = tokenValue.trim();
+    this.newPassword = passwordValue;
+    this.confirm = confirmValue;
     
     if(!this.token) {this.error = 'Falta el token de recuperación.'; return;}
     if (this.newPassword !== this.confirm) {

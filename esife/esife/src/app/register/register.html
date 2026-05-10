@@ -25,15 +25,26 @@
 
     <label>
       Contraseña
-      <input
-        #passwordInput
-        type="password"
-        name="password"
-        [(ngModel)]="password"
-        required
-        minlength="8"
-        #passwordCtrl="ngModel"
-      />
+      <span class="password-field">
+        <input
+          #passwordInput
+          [type]="mostrarPassword ? 'text' : 'password'"
+          name="password"
+          [(ngModel)]="password"
+          required
+          minlength="8"
+          #passwordCtrl="ngModel"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          (click)="mostrarPassword = !mostrarPassword"
+          [attr.aria-label]="mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          [attr.title]="mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+        >
+          <span aria-hidden="true">👁</span>
+        </button>
+      </span>
     </label>
 
     <p class="error" *ngIf="(passwordCtrl.dirty || passwordCtrl.touched) && passwordCtrl.errors?.['required']">
@@ -50,14 +61,25 @@
 
     <label>
       Repite la contraseña
-      <input
-        #confirmInput
-        type="password"
-        name="confirm"
-        [(ngModel)]="confirm"
-        required
-        #confirmCtrl="ngModel"
-      />
+      <span class="password-field">
+        <input
+          #confirmInput
+          [type]="mostrarConfirm ? 'text' : 'password'"
+          name="confirm"
+          [(ngModel)]="confirm"
+          required
+          #confirmCtrl="ngModel"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          (click)="mostrarConfirm = !mostrarConfirm"
+          [attr.aria-label]="mostrarConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          [attr.title]="mostrarConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+        >
+          <span aria-hidden="true">👁</span>
+        </button>
+      </span>
     </label>
 
     <p class="error" *ngIf="(confirmCtrl.dirty || confirmCtrl.touched) && confirmCtrl.errors?.['required']">

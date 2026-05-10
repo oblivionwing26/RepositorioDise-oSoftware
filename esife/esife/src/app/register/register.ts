@@ -18,6 +18,8 @@ export class Register {
   error: string | null = null;
   loading = false;
   ok = false;
+  mostrarPassword = false;
+  mostrarConfirm = false;
 
   constructor(
     private auth: Auth,

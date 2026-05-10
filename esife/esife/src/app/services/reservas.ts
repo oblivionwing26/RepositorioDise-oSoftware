@@ -17,13 +17,13 @@ export class ReservasService {
 
   prerreservar(
     idEntrada: number,
-    tokenUsuario: string,
+    tokenUsuario?: string | null,
+    clienteId?: string | null,
     idTurno?: number | null,
     tokenPrerreserva?: string | null
   ): Observable<PrerreservaResponse> {
-    let params = new HttpParams()
-      .set('idEntrada', idEntrada)
-      .set('tokenUsuario', tokenUsuario);
+    let params = this.paramsIdentidad(tokenUsuario, clienteId)
+      .set('idEntrada', idEntrada);
 
     if (idTurno != null) {
       params = params.set('idTurno', idTurno);
@@ -42,16 +42,28 @@ export class ReservasService {
 
   liberarEntradaPrerreservada(
     idEntrada: number,
-    tokenUsuario: string,
-    tokenPrerreserva: string
+    tokenUsuario: string | null,
+    clienteId: string | null,
+    tokenPrerreserva: string,
   ): Observable<void> {
-    const params = new HttpParams()
-      .set('tokenUsuario', tokenUsuario)
+    const params = this.paramsIdentidad(tokenUsuario, clienteId)
       .set('tokenPrerreserva', tokenPrerreserva);
 
     return this.http.delete<void>(
       `${this.RESERVAS_API}/prerreservar/${idEntrada}`,
       { params }
     );
+  }
+
+  private paramsIdentidad(tokenUsuario?: string | null, clienteId?: string | null): HttpParams {
+    let params = new HttpParams();
+
+    if (tokenUsuario) {
+      params = params.set('tokenUsuario', tokenUsuario);
+    } else if (clienteId) {
+      params = params.set('clienteId', clienteId);
+    }
+
+    return params;
   }
 }

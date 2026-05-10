@@ -40,23 +40,33 @@ public class ReservasController {
     @PutMapping("/prerreservar")
     public DtoPrerreserva prerreservar(
             @RequestParam Long idEntrada,
-            @RequestParam String tokenUsuario,
+            @RequestParam(required = false) String tokenUsuario,
+            @RequestParam(required = false) String clienteId,
             @RequestParam(required = false) Long idTurno,
             @RequestParam(required = false) String tokenPrerreserva) {
 
-        String email = this.usuariosService.checkToken(tokenUsuario);
-
-        return this.service.prerreservar(idEntrada, email, idTurno, tokenPrerreserva);
+        return this.service.prerreservar(idEntrada, resolverIdentidad(tokenUsuario, clienteId), idTurno, tokenPrerreserva);
     }
 
     @DeleteMapping("/prerreservar/{idEntrada}")
     public void liberarEntradaPrerreservada(
             @PathVariable Long idEntrada,
-            @RequestParam String tokenUsuario,
+            @RequestParam(required = false) String tokenUsuario,
+            @RequestParam(required = false) String clienteId,
             @RequestParam String tokenPrerreserva) {
 
-        String email = this.usuariosService.checkToken(tokenUsuario);
+        this.service.liberarEntradaPrerreservada(tokenPrerreserva, idEntrada, resolverIdentidad(tokenUsuario, clienteId));
+    }
 
-        this.service.liberarEntradaPrerreservada(tokenPrerreserva, idEntrada, email);
+    private String resolverIdentidad(String tokenUsuario, String clienteId) {
+        if (tokenUsuario != null && !tokenUsuario.isBlank()) {
+            return this.usuariosService.checkToken(tokenUsuario);
+        }
+
+        if (clienteId == null || clienteId.isBlank()) {
+            return null;
+        }
+
+        return "anon:" + clienteId.trim();
     }
 }
