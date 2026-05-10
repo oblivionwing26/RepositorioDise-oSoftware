@@ -1,18 +1,18 @@
 <section class="auth-card">
   <h2>Iniciar sesión</h2>
 
-  <form (ngSubmit)="submit()" #f="ngForm">
+  <form (ngSubmit)="submit(emailInput.value, passwordInput.value)" novalidate>
     <label>
       Email
-      <input type="email" name="email" [(ngModel)]="email" required />
+      <input #emailInput type="email" name="email" [(ngModel)]="email" required />
     </label>
 
     <label>
       Contraseña
-      <input type="password" name="password" [(ngModel)]="password" required />
+      <input #passwordInput type="password" name="password" [(ngModel)]="password" required />
     </label>
 
-    <button type="submit" [disabled]="loading || !f.valid">
+    <button type="submit" [disabled]="loading">
       {{ loading ? 'Entrando…' : 'Entrar' }}
     </button>
   </form>

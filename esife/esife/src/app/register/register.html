@@ -1,10 +1,11 @@
 <section class="auth-card">
   <h2>Crear cuenta</h2>
 
-  <form (ngSubmit)="submit()" #f="ngForm" novalidate>
+  <form (ngSubmit)="submit(emailInput.value, passwordInput.value, confirmInput.value)" novalidate>
     <label>
       Email
       <input
+        #emailInput
         type="email"
         name="email"
         [(ngModel)]="email"
@@ -25,6 +26,7 @@
     <label>
       Contraseña
       <input
+        #passwordInput
         type="password"
         name="password"
         [(ngModel)]="password"
@@ -49,6 +51,7 @@
     <label>
       Repite la contraseña
       <input
+        #confirmInput
         type="password"
         name="confirm"
         [(ngModel)]="confirm"
@@ -65,7 +68,7 @@
       Las contraseñas no coinciden.
     </p>
 
-    <button type="submit" [disabled]="loading || formularioInvalido(f)">
+    <button type="submit" [disabled]="loading">
       {{ loading ? 'Creando…' : 'Registrarse' }}
     </button>
   </form>

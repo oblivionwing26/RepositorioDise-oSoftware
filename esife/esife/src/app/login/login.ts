@@ -26,8 +26,17 @@ export class Login {
     private cdr: ChangeDetectorRef,
   ) {}
 
-  submit(): void{
+  submit(emailValue = this.email, passwordValue = this.password): void{
     this.error = null;
+
+    this.email = emailValue.trim();
+    this.password = passwordValue;
+
+    if (!this.email || !this.password) {
+      this.error = 'Introduce email y contraseña.';
+      return;
+    }
+
     this.loading = true;
     this.auth.login(this.email, this.password).subscribe({
       next: res => {

@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component } from "@angular/core";
-import { FormsModule, NgForm } from "@angular/forms";
+import { FormsModule } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
 import { Auth } from "../services/auth";
 
@@ -33,17 +33,18 @@ export class Register {
     return /[A-Za-z]/.test(p) && /\d/.test(p);
   }
 
-  formularioInvalido(f: NgForm): boolean {
-    return (
-      f.invalid ||
-      this.password !== this.confirm ||
-      !this.validClient(this.password)
-    );
-  }
-  
-  submit(): void {
+  submit(emailValue = this.email, passwordValue = this.password, confirmValue = this.confirm): void {
     this.error = null;
     this.ok = false;
+
+    this.email = emailValue.trim();
+    this.password = passwordValue;
+    this.confirm = confirmValue;
+
+    if (!this.email || !this.password || !this.confirm) {
+      this.error = 'Completa todos los campos.';
+      return;
+    }
 
     if (this.password !== this.confirm) {
       this.error = 'Las contraseñas no coinciden.';

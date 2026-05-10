@@ -16,10 +16,19 @@ export class ForgotPassword {
   email = '';
   sent = false;
   loading = false;
+  error: string | null = null;
 
   constructor (private auth: Auth, private cdr: ChangeDetectorRef) {}
 
-  submit(): void {
+  submit(emailValue = this.email): void {
+    this.error = null;
+    this.email = emailValue.trim();
+
+    if (!this.email) {
+      this.error = 'Introduce el email de tu cuenta.';
+      return;
+    }
+
     this.loading = true;
     this.auth.forgotPassword(this.email).subscribe({
       next: () => { this.loading = false; this.sent = true; this.cdr.detectChanges(); },
