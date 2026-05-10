@@ -244,6 +244,7 @@ export class Compra implements OnInit, OnDestroy {
         this.entradas.forEach(entrada => {
           entrada.estado = compra.estado;
         });
+        this.finalizarTurnoCola(null, this.clienteAnonimo.getId());
         this.limpiarCompraPendiente();
         this.destruirFormularioStripe();
         this.loading = false;
@@ -364,7 +365,6 @@ export class Compra implements OnInit, OnDestroy {
     if (!entrada) {
       this.loadingPrerreserva = false;
       this.detenerPollingCola();
-      this.finalizarTurnoCola(tokenUsuario, clienteId);
       this.guardarCompraPendiente();
       this.cdr.detectChanges();
       return;
@@ -378,7 +378,6 @@ export class Compra implements OnInit, OnDestroy {
         if (index + 1 >= this.entradas.length) {
           this.loadingPrerreserva = false;
           this.detenerPollingCola();
-          this.finalizarTurnoCola(tokenUsuario, clienteId);
           this.guardarCompraPendiente();
           this.cdr.detectChanges();
           return;
