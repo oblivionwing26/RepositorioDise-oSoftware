@@ -3,11 +3,13 @@ package edu.esi.ds.esiusuarios.services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
@@ -47,13 +49,22 @@ public class EmailService {
             .queryParam("token", token)
             .toUriString();
 
-        String body = "Hola,\n\n"
+        String textBody = "Hola,\n\n"
             + "Has solicitado restablecer tu contrasena en ESI Entradas.\n"
-            + "Abre este enlace para elegir una nueva contrasena:\n\n"
-            + resetLink + "\n\n"
-            + "Si el enlace no funciona, copia este token en la pantalla de restablecimiento:\n\n"
-            + token + "\n\n"
-            + "El token es valido por " + resetExpirationMinutes + " minutos.\n\n";
+            + "Abre el enlace de recuperacion del correo para elegir una nueva contrasena.\n\n"
+            + "El enlace es valido por " + resetExpirationMinutes + " minutos.\n\n";
+
+        String safeResetLink = htmlEscape(resetLink);
+        String htmlBody = """
+            <div style=\"font-family: Arial, sans-serif; color: #222; line-height: 1.5;\">
+              <p>Hola,</p>
+              <p>Has solicitado restablecer tu contrasena en ESI Entradas.</p>
+              <p>
+                <a href=\"%s\" style=\"display: inline-block; padding: 12px 18px; background: #ffb703; color: #211231; font-weight: 700; text-decoration: none; border-radius: 8px;\">Restablecer contraseña</a>
+              </p>
+              <p>El enlace es valido por %d minutos.</p>
+            </div>
+            """.formatted(safeResetLink, resetExpirationMinutes);
 
         if (!smtpConfigurado()) {
             log.warn("SMTP no configurado correctamente. No se envio email de recuperacion a {}.", to);
@@ -61,14 +72,15 @@ public class EmailService {
         }
 
         try {
-            SimpleMailMessage msg = new SimpleMailMessage();
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             String remitente = remitente();
             if (!remitente.isBlank()) {
-                msg.setFrom(remitente);
+                helper.setFrom(remitente);
             }
-            msg.setTo(to);
-            msg.setSubject(subject);
-            msg.setText(body);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(textBody, htmlBody);
             mailSender.send(msg);
             log.info("Email de recuperacion enviado a {}", to);
         } catch (Exception ex) {
@@ -77,6 +89,14 @@ public class EmailService {
             log.error("Fallo al enviar email a {}: {}", to, ex.getMessage());
             log.warn("No se muestra el token de recuperacion por consola.");
         }
+    }
+
+    private String htmlEscape(String value) {
+        return value
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
     }
 
     private boolean smtpConfigurado() {
